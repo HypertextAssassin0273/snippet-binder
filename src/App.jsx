@@ -53,7 +53,7 @@ const utf8ToBase64 = (str) => btoa(Array.from(new TextEncoder().encode(str), byt
 const getStoredToken = () => { try { return localStorage.getItem('gh_token') || ""; } catch { return ""; } };
 
 // ==========================================
-// 🧩 GIST EMBED COMPONENT (Restored)
+// 🧩 GIST EMBED COMPONENT
 // ==========================================
 const GistEmbed = ({ url }) => {
   const gistUrl = url.includes('.js') ? url : `${url}.js`;
@@ -95,7 +95,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   
   // Layout States
-  const [isSidebarOpen, _setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [middlePaneWidth, setMiddlePaneWidth] = useState(320); 
   const [isDragging, setIsDragging] = useState(false);
   const [theme, setTheme] = useState(() => {
@@ -232,7 +232,7 @@ export default function App() {
   }, []);
 
   const saveToGitHub = async () => {
-    if (!ghToken || !GITHUB_CONFIG.OWNER || GITHUB_CONFIG.OWNER === "your-username") {
+    if (!ghToken || !GITHUB_CONFIG.OWNER) {
       return alert("Please update GITHUB_CONFIG and provide a Token.");
     }
     
@@ -442,18 +442,14 @@ export default function App() {
 
       {/* LEFT PANE */}
       <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} flex-shrink-0 bg-gray-50 dark:bg-[#161b22] flex flex-col transition-all duration-300 relative border-r border-gray-200 dark:border-[#30363d]`}>
-        <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="absolute -right-3 top-5 z-20 bg-white dark:bg-[#30363d] hover:bg-gray-100 dark:hover:bg-[#484f58] border border-gray-200 dark:border-[#21262d] rounded-full p-1 text-gray-600 dark:text-white shadow-md">
-          {isSidebarOpen ? <ChevronLeft size={14}/> : <Menu size={14}/>}
-        </button>
-
         <div className={`flex flex-col h-full overflow-hidden ${!isSidebarOpen && 'opacity-0 pointer-events-none'}`}>
           <div className="p-4 border-b border-gray-200 dark:border-[#30363d] flex items-center justify-between min-w-[255px]">
             <div className="flex items-center gap-2 font-semibold">
               <FileCode size={20} className="text-blue-500 dark:text-[#58a6ff]" />
               <span>DevBinder</span>
             </div>
-            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#30363d] text-gray-500 dark:text-[#8b949e]">
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            <button onClick={() => setIsSidebarOpen(false)} className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-[#30363d] text-gray-500 dark:text-[#8b949e] transition-colors" title="Close Sidebar">
+              <ChevronLeft size={16} />
             </button>
           </div>
           
@@ -486,8 +482,22 @@ export default function App() {
       <div className="flex-shrink-0 bg-white dark:bg-[#0d1117] flex flex-col" style={{ width: `${middlePaneWidth}px` }}>
         <div className="p-4 border-b border-gray-200 dark:border-[#30363d] space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold truncate pr-2">{activeSection || "Snippets"}</h2>
-            <button onClick={() => { setFormSection(activeSection || sections[0] || ""); setFormIsShared(false); setIsAdding(true); }} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md"><Plus size={16} /></button>
+            <div className="flex items-center gap-2">
+              {!isSidebarOpen && (
+                <button onClick={() => setIsSidebarOpen(true)} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Open Sidebar">
+                  <Menu size={16} />
+                </button>
+              )}
+              <h2 className="font-semibold truncate pr-2">{activeSection || "Snippets"}</h2>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Toggle Theme">
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              <button onClick={() => { setFormSection(activeSection || sections[0] || ""); setFormIsShared(false); setIsAdding(true); }} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Add Snippet">
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-2.5 text-gray-400 dark:text-[#8b949e]" size={14} />
