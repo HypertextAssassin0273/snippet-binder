@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Folder, FileCode, Plus, Save, Copy, 
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
-  RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2
+  RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
+  Link as LinkIcon, Youtube
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -53,25 +54,38 @@ const utf8ToBase64 = (str) => btoa(Array.from(new TextEncoder().encode(str), byt
 const getStoredToken = () => { try { return localStorage.getItem('gh_token') || ""; } catch { return ""; } };
 
 // ==========================================
-// 🧩 GIST EMBED COMPONENT
+// 🧩 EMBED COMPONENTS
 // ==========================================
-const GistEmbed = ({ url }) => {
+const GistEmbed = ({ url, theme }) => {
   const gistUrl = url.includes('.js') ? url : `${url}.js`;
+  const isDark = theme === 'dark';
+  
+  // Dynamic CSS variables based on theme
+  const colors = {
+    bg: isDark ? '#0d1117' : '#ffffff',
+    border: isDark ? '#30363d' : '#e5e7eb',
+    metaBg: isDark ? '#161b22' : '#f9fafb',
+    text: isDark ? '#c9d1d9' : '#1f2328',
+    metaText: isDark ? '#8b949e' : '#6b7280',
+    link: isDark ? '#58a6ff' : '#2563eb'
+  };
+
   const iframeSrc = `
     <html>
       <head>
         <base target="_blank">
         <style>
-          body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #010409; }
-          .gist .gist-file { border-radius: 8px; border: 1px solid #30363d !important; margin: 0 !important; }
-          .gist .gist-data { background-color: #0d1117 !important; border-bottom: 1px solid #30363d !important; }
-          .gist .blob-wrapper table { color: #c9d1d9 !important; }
-          .gist .blob-num { color: #484f58 !important; border-right: 1px solid #30363d !important; }
-          .gist .pl-s { color: #a5d6ff !important; }
-          .gist .pl-k { color: #ff7b72 !important; }
-          .gist .pl-en { color: #d2a8ff !important; }
-          .gist .gist-meta { background-color: #161b22 !important; color: #8b949e !important; font-size: 12px !important; border-radius: 0 0 8px 8px; }
-          .gist .gist-meta a { color: #58a6ff !important; }
+          body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: ${colors.bg}; }
+          .gist .gist-file { border-radius: 8px; border: 1px solid ${colors.border} !important; margin: 0 !important; }
+          .gist .gist-data { background-color: ${colors.bg} !important; border-bottom: 1px solid ${colors.border} !important; }
+          .gist .blob-wrapper table { color: ${colors.text} !important; }
+          .gist .blob-num { color: ${colors.metaText} !important; border-right: 1px solid ${colors.border} !important; background: transparent !important; }
+          .gist .pl-s { color: ${isDark ? '#a5d6ff' : '#0a3069'} !important; }
+          .gist .pl-k { color: ${isDark ? '#ff7b72' : '#cf222e'} !important; }
+          .gist .pl-en { color: ${isDark ? '#d2a8ff' : '#8250df'} !important; }
+          .gist .gist-meta { background-color: ${colors.metaBg} !important; color: ${colors.metaText} !important; font-size: 12px !important; border-radius: 0 0 8px 8px; padding: 10px !important; }
+          .gist .gist-meta a { color: ${colors.link} !important; text-decoration: none; }
+          .gist .gist-meta a:hover { text-decoration: underline; }
         </style>
       </head>
       <body>
@@ -80,11 +94,46 @@ const GistEmbed = ({ url }) => {
     </html>
   `;
   return (
-    <iframe
-      srcDoc={iframeSrc}
-      className="w-full h-full border-none rounded-lg min-h-[400px]"
-      title="GitHub Gist"
-    />
+    <iframe srcDoc={iframeSrc} className="w-full h-full border-none rounded-lg min-h-[400px]" title="GitHub Gist" />
+  );
+};
+
+const LinkViewer = ({ url }) => {
+  const isYoutube = url.includes('youtube.com/watch?v=') || url.includes('youtu.be/');
+  
+  if (isYoutube) {
+    const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : url.split('youtu.be/')[1].split('?')[0];
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-[#30363d] shadow-sm">
+          <iframe 
+            src={`https://www.youtube.com/embed/${videoId}`} 
+            className="absolute top-0 left-0 w-full h-full border-none"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowFullScreen 
+            title="YouTube Video"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center px-4">
+      <div className="p-8 bg-gray-50 dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-2xl max-w-lg w-full shadow-sm">
+        <div className="w-16 h-16 bg-blue-100 dark:bg-[#1f6feb]/20 text-blue-600 dark:text-[#58a6ff] rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <LinkIcon size={32} />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">External Reference</h3>
+        <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-6 line-clamp-2">{url}</p>
+        <a 
+          href={url} target="_blank" rel="noreferrer" 
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          Open Link <ExternalLink size={16} />
+        </a>
+      </div>
+    </div>
   );
 };
 
@@ -279,7 +328,7 @@ export default function App() {
     }
   };
 
-  // PrismJS Init
+  // PrismJS Init with Autoloader for 290+ languages
   useEffect(() => {
     const prismCss = document.createElement('link');
     prismCss.rel = 'stylesheet';
@@ -291,9 +340,19 @@ export default function App() {
     const prismJs = document.createElement('script');
     prismJs.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js';
     prismJs.async = true;
-    prismJs.onload = () => window.Prism?.highlightAll();
-    document.body.appendChild(prismJs);
     
+    prismJs.onload = () => {
+      // Load the autoloader plugin after core Prism loads
+      const autoloader = document.createElement('script');
+      autoloader.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js';
+      autoloader.onload = () => {
+        window.Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+        window.Prism?.highlightAll();
+      };
+      document.body.appendChild(autoloader);
+    };
+    
+    document.body.appendChild(prismJs);
     return () => { document.head.removeChild(prismCss); document.body.removeChild(prismJs); };
   }, [theme]);
 
@@ -321,7 +380,7 @@ export default function App() {
     if (!activeSnippet) return;
     setFormTitle(activeSnippet.title);
     setFormType(activeSnippet.type);
-    setFormLang(activeSnippet.language);
+    setFormLang(activeSnippet.language || "javascript");
     setFormTags(activeSnippet.tags.join(', '));
     setFormContent(activeSnippet.type === 'code' ? activeSnippet.content : activeSnippet.url);
     setFormSection(activeSection);
@@ -514,7 +573,8 @@ export default function App() {
                 <li key={snippet.id}>
                   <button onClick={() => setActiveSnippet(snippet)} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
-                      {snippet.type === 'gist' ? <Github size={16} /> : <Code size={16} />}
+                      {snippet.type === 'gist' ? <Github size={16} /> : 
+                       snippet.type === 'link' ? <LinkIcon size={16} /> : <Code size={16} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
@@ -546,7 +606,10 @@ export default function App() {
                   {activeSnippet.isShared && <span className="bg-blue-100 text-blue-700 dark:bg-[#1f6feb]/20 dark:text-[#58a6ff] text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><Share2 size={10}/> Shared</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs font-mono text-gray-500 dark:text-[#8b949e] uppercase flex items-center gap-1">{activeSnippet.type === 'gist' ? <Github size={12}/> : <Code size={12}/>}{activeSnippet.language}</span>
+                  <span className="text-xs font-mono text-gray-500 dark:text-[#8b949e] uppercase flex items-center gap-1">
+                    {activeSnippet.type === 'gist' ? <Github size={12}/> : activeSnippet.type === 'link' ? <LinkIcon size={12}/> : <Code size={12}/>}
+                    {activeSnippet.type !== 'link' && activeSnippet.language}
+                  </span>
                   <div className="flex gap-1.5">{activeSnippet.tags.map(tag => <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white border-gray-300 dark:bg-[#21262d] dark:border-[#30363d] border text-gray-600 dark:text-[#c9d1d9]">{tag}</span>)}</div>
                 </div>
               </div>
@@ -562,6 +625,8 @@ export default function App() {
                 <div className="prism-code-override h-full">
                   <pre className="h-full p-4 overflow-auto text-sm font-mono"><code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code></pre>
                 </div>
+              ) : activeSnippet.type === 'link' ? (
+                <div className="h-full w-full py-4"><LinkViewer url={activeSnippet.url} /></div>
               ) : (
                 <div className="h-full flex flex-col">
                   <div className="bg-gray-50 dark:bg-[#161b22] px-4 py-2 flex items-center gap-2 border border-gray-200 dark:border-[#30363d] border-b-0 rounded-t-lg">
@@ -570,7 +635,7 @@ export default function App() {
                     <a href={activeSnippet.url} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-[#58a6ff] hover:underline text-xs flex items-center gap-1">Open <ExternalLink size={12} /></a>
                   </div>
                   <div className="flex-1 w-full bg-gray-50 dark:bg-[#010409] rounded-b-lg border border-gray-200 dark:border-[#30363d]">
-                    <GistEmbed url={activeSnippet.url} />
+                    <GistEmbed url={activeSnippet.url} theme={theme} />
                   </div>
                 </div>
               )}
@@ -641,13 +706,32 @@ export default function App() {
             <div className="overflow-y-auto">
               <form onSubmit={handleSaveSnippet} className="p-6 space-y-4">
                 <div className="flex gap-4">
-                  <div className="flex-1"><label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Title</label><input required type="text" value={formTitle} onChange={e=>setFormTitle(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" /></div>
-                  <div className="w-1/3"><label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Collection</label><select value={formSection} onChange={e=>setFormSection(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">{sections.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Title</label>
+                    <input required type="text" value={formTitle} onChange={e=>setFormTitle(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                  </div>
+                  <div className="w-1/3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Collection</label>
+                    <select value={formSection} onChange={e=>setFormSection(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">{sections.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                  </div>
                 </div>
                 <div className="flex gap-4">
-                  <div className="w-1/3"><label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Source Type</label><select value={formType} onChange={e=>setFormType(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none"><option value="code">Raw Code</option><option value="gist">GitHub Gist URL</option></select></div>
-                  <div className="w-1/3"><label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label><input type="text" value={formLang} onChange={e=>setFormLang(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" /></div>
-                  <div className="w-1/3"><label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Tags (comma sep)</label><input type="text" value={formTags} onChange={e=>setFormTags(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" /></div>
+                  <div className="w-1/3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Source Type</label>
+                    <select value={formType} onChange={e=>setFormType(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                      <option value="code">Raw Code</option>
+                      <option value="gist">GitHub Gist URL</option>
+                      <option value="link">Web Link / Video URL</option>
+                    </select>
+                  </div>
+                  <div className={`w-1/3 ${formType === 'link' ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
+                    <input type="text" value={formLang} onChange={e=>setFormLang(e.target.value)} disabled={formType === 'link'} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                  </div>
+                  <div className="w-1/3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Tags (comma sep)</label>
+                    <input type="text" value={formTags} onChange={e=>setFormTags(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-[#010409] border border-gray-200 dark:border-[#30363d] rounded-md">
@@ -658,8 +742,12 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">{formType === 'code' ? 'Code Content' : 'Gist URL'}</label>
-                  {formType === 'code' ? <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-64 focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> : <input required type="url" value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 font-mono text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />}
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">{formType === 'code' ? 'Code Content' : formType === 'gist' ? 'Gist URL' : 'Link URL'}</label>
+                  {formType === 'code' ? (
+                    <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-64 focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> 
+                  ) : (
+                    <input required type="url" value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 font-mono text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" placeholder="https://" />
+                  )}
                 </div>
                 <div className="flex justify-end pt-4 gap-3 border-t border-gray-200 dark:border-[#30363d] mt-4">
                   <button type="button" onClick={() => { setIsAdding(false); setEditingSnippetId(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-transparent dark:border-[#30363d] rounded-md transition-colors">Cancel</button>
