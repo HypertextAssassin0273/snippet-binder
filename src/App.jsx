@@ -142,6 +142,7 @@ export default function App() {
     return payload;
   }, [db, syncOnlyShared]);
 
+  // FIX: Normalized comparison to prevent false positives on initial load
   const hasChanges = useMemo(() => {
     return lastSyncedDb !== "" && JSON.stringify(payloadDb) !== lastSyncedDb;
   }, [payloadDb, lastSyncedDb]);
@@ -158,7 +159,7 @@ export default function App() {
         
         if (res.status === 404) {
           setSyncStatus("No existing data found. Ready to push.");
-          setLastSyncedDb(JSON.stringify({})); // Empty state remotely
+          setLastSyncedDb(JSON.stringify(payloadDb)); // Initialize with current payload
           return;
         }
         if (!res.ok) throw new Error("Failed to fetch from GitHub.");
@@ -170,10 +171,9 @@ export default function App() {
         const decodedDb = JSON.parse(decodedString);
         
         // Merge strategy: Overwrite local with remote on fetch to ensure visitors see latest.
-        // For the owner (with token), they might have local changes. To avoid wiping local unsaved changes, 
-        // we only overwrite if this is an unauthenticated user OR we could prompt. For simplicity:
         setDb(decodedDb);
-        setLastSyncedDb(decodedString);
+        // FIX: Stringify the parsed object to strip arbitrary formatting differences
+        setLastSyncedDb(JSON.stringify(decodedDb));
         setActiveSection(prev => prev || Object.keys(decodedDb)[0] || "");
         setSyncStatus("");
       } catch (err) {
@@ -182,6 +182,7 @@ export default function App() {
       }
     };
     initFetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveToGitHub = async () => {
@@ -206,11 +207,16 @@ export default function App() {
         })
       });
 
+      // FIX: Handle Concurrency (Stalemate)
+      if (res.status === 409) {
+        throw new Error("Conflict: Another user updated the snippets. Please refresh the page to get the latest data before pushing.");
+      }
       if (!res.ok) throw new Error("Failed to save. Check permissions or conflicts.");
       
       const data = await res.json();
       setFileSha(data.content.sha); 
-      setLastSyncedDb(JSON.stringify(payloadDb)); // Update tracking string
+      // FIX: Update tracking string with strict unformatted JSON for accurate comparison
+      setLastSyncedDb(JSON.stringify(payloadDb)); 
       setSyncStatus(`Successfully pushed to ${GITHUB_CONFIG.BRANCH}!`);
       setTimeout(() => setSyncStatus(""), 4000);
     } catch (err) {
