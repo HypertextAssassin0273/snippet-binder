@@ -3,7 +3,7 @@ import {
   Search, Folder, FileCode, Plus, Save, Copy, 
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
-  Link as LinkIcon, Youtube
+  Link as LinkIcon
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -100,11 +100,13 @@ const GistEmbed = ({ url, theme }) => {
 
 const LinkViewer = ({ url }) => {
   const isYoutube = url.includes('youtube.com/watch?v=') || url.includes('youtu.be/');
+  const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf');
+  const isImage = url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i);
   
   if (isYoutube) {
     const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : url.split('youtu.be/')[1].split('?')[0];
     return (
-      <div className="w-full max-w-4xl mx-auto">
+      <div className="w-full max-w-4xl mx-auto h-full flex flex-col justify-center">
         <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-[#30363d] shadow-sm">
           <iframe 
             src={`https://www.youtube.com/embed/${videoId}`} 
@@ -118,6 +120,29 @@ const LinkViewer = ({ url }) => {
     );
   }
 
+  if (isPdf) {
+    return (
+      <iframe 
+        src={url} 
+        className="w-full h-full border border-gray-200 dark:border-[#30363d] rounded-xl" 
+        title="PDF Viewer" 
+      />
+    );
+  }
+
+  if (isImage) {
+    return (
+      <div className="w-full h-full flex items-center justify-center p-4">
+        <img 
+          src={url} 
+          alt="Embed" 
+          className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" 
+        />
+      </div>
+    );
+  }
+
+  // Fallback for generic links
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
       <div className="p-8 bg-gray-50 dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-2xl max-w-lg w-full shadow-sm">
