@@ -52,6 +52,42 @@ const INITIAL_DB = { "My Snippets": [] };
 const utf8ToBase64 = (str) => btoa(Array.from(new TextEncoder().encode(str), byte => String.fromCodePoint(byte)).join(""));
 const getStoredToken = () => { try { return localStorage.getItem('gh_token') || ""; } catch { return ""; } };
 
+// ==========================================
+// 🧩 GIST EMBED COMPONENT (Restored)
+// ==========================================
+const GistEmbed = ({ url }) => {
+  const gistUrl = url.includes('.js') ? url : `${url}.js`;
+  const iframeSrc = `
+    <html>
+      <head>
+        <base target="_blank">
+        <style>
+          body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #010409; }
+          .gist .gist-file { border-radius: 8px; border: 1px solid #30363d !important; margin: 0 !important; }
+          .gist .gist-data { background-color: #0d1117 !important; border-bottom: 1px solid #30363d !important; }
+          .gist .blob-wrapper table { color: #c9d1d9 !important; }
+          .gist .blob-num { color: #484f58 !important; border-right: 1px solid #30363d !important; }
+          .gist .pl-s { color: #a5d6ff !important; }
+          .gist .pl-k { color: #ff7b72 !important; }
+          .gist .pl-en { color: #d2a8ff !important; }
+          .gist .gist-meta { background-color: #161b22 !important; color: #8b949e !important; font-size: 12px !important; border-radius: 0 0 8px 8px; }
+          .gist .gist-meta a { color: #58a6ff !important; }
+        </style>
+      </head>
+      <body>
+        <script src="${gistUrl}"></script>
+      </body>
+    </html>
+  `;
+  return (
+    <iframe
+      srcDoc={iframeSrc}
+      className="w-full h-full border-none rounded-lg min-h-[400px]"
+      title="GitHub Gist"
+    />
+  );
+};
+
 export default function App() {
   const [db, setDb] = useState(null); // null indicates DB is loading from IndexedDB
   const [activeSection, setActiveSection] = useState("");
@@ -59,7 +95,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   
   // Layout States
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, _setIsSidebarOpen] = useState(true);
   const [middlePaneWidth, setMiddlePaneWidth] = useState(320); 
   const [isDragging, setIsDragging] = useState(false);
   const [theme, setTheme] = useState(() => {
@@ -406,7 +442,7 @@ export default function App() {
 
       {/* LEFT PANE */}
       <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} flex-shrink-0 bg-gray-50 dark:bg-[#161b22] flex flex-col transition-all duration-300 relative border-r border-gray-200 dark:border-[#30363d]`}>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="absolute -right-3 top-5 z-20 bg-white dark:bg-[#30363d] hover:bg-gray-100 dark:hover:bg-[#484f58] border border-gray-200 dark:border-[#21262d] rounded-full p-1 text-gray-600 dark:text-white shadow-md">
+        <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="absolute -right-3 top-5 z-20 bg-white dark:bg-[#30363d] hover:bg-gray-100 dark:hover:bg-[#484f58] border border-gray-200 dark:border-[#21262d] rounded-full p-1 text-gray-600 dark:text-white shadow-md">
           {isSidebarOpen ? <ChevronLeft size={14}/> : <Menu size={14}/>}
         </button>
 
