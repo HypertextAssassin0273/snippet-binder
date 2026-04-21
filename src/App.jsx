@@ -25,6 +25,44 @@ const GITHUB_CONFIG = {
 };
 
 // ==========================================
+// 📚 SUPPORTED LANGUAGES (Native Datalist)
+// Any Prism ID can be typed; this is just the autocomplete dictionary.
+// ==========================================
+const PRISM_LANGUAGES = [
+  { id: 'abap', label: 'ABAP' }, { id: 'actionscript', label: 'ActionScript' }, { id: 'ada', label: 'Ada' },
+  { id: 'apex', label: 'APEX' }, { id: 'applescript', label: 'AppleScript' }, { id: 'asm6502', label: 'Assembly' },
+  { id: 'awk', label: 'AWK' }, { id: 'bash', label: 'Bash / Shell' }, { id: 'basic', label: 'BASIC' },
+  { id: 'bicep', label: 'Bicep' }, { id: 'c', label: 'C' }, { id: 'clojure', label: 'Clojure' },
+  { id: 'cmake', label: 'CMake' }, { id: 'cobol', label: 'COBOL' }, { id: 'coffeescript', label: 'CoffeeScript' },
+  { id: 'cpp', label: 'C++ (cpp)' }, { id: 'csharp', label: 'C# (cs)' }, { id: 'css', label: 'CSS' },
+  { id: 'csv', label: 'CSV' }, { id: 'dart', label: 'Dart' }, { id: 'django', label: 'Django' },
+  { id: 'docker', label: 'Dockerfile' }, { id: 'elixir', label: 'Elixir' }, { id: 'elm', label: 'Elm' },
+  { id: 'erb', label: 'ERB' }, { id: 'erlang', label: 'Erlang' }, { id: 'fsharp', label: 'F#' },
+  { id: 'gdscript', label: 'GDScript' }, { id: 'glsl', label: 'GLSL' }, { id: 'go', label: 'Go' },
+  { id: 'graphql', label: 'GraphQL' }, { id: 'groovy', label: 'Ruby' }, { id: 'haskell', label: 'Haskell' },
+  { id: 'haxe', label: 'Haxe' }, { id: 'html', label: 'HTML' }, { id: 'http', label: 'HTTP' },
+  { id: 'ini', label: 'INI' }, { id: 'java', label: 'Java' }, { id: 'javascript', label: 'JavaScript (js)' },
+  { id: 'json', label: 'JSON' }, { id: 'jsx', label: 'React JSX' }, { id: 'julia', label: 'Julia' },
+  { id: 'kotlin', label: 'Kotlin' }, { id: 'latex', label: 'LaTeX' }, { id: 'less', label: 'Less' },
+  { id: 'lisp', label: 'Haskell' }, { id: 'lua', label: 'Lua' }, { id: 'makefile', label: 'Makefile' },
+  { id: 'markdown', label: 'Markdown (md)' }, { id: 'matlab', label: 'MATLAB' }, { id: 'nginx', label: 'nginx' },
+  { id: 'nim', label: 'Nim' }, { id: 'nix', label: 'Nix' }, { id: 'objectivec', label: 'Objective-C' },
+  { id: 'ocaml', label: 'OCaml' }, { id: 'pascal', label: 'Pascal' }, { id: 'perl', label: 'Perl' },
+  { id: 'php', label: 'PHP' }, { id: 'powershell', label: 'PowerShell' }, { id: 'prolog', label: 'Prolog' },
+  { id: 'properties', label: '.properties' }, { id: 'protobuf', label: 'Protocol Buffers' }, { id: 'pug', label: 'Pug' },
+  { id: 'python', label: 'Python (py)' }, { id: 'qml', label: 'QML' }, { id: 'r', label: 'R' },
+  { id: 'regex', label: 'Regex' }, { id: 'ruby', label: 'Ruby' }, { id: 'rust', label: 'Rust' },
+  { id: 'sass', label: 'Sass (Sass)' }, { id: 'scala', label: 'Scala' }, { id: 'scheme', label: 'Scheme' },
+  { id: 'scss', label: 'Sass (Scss)' }, { id: 'solidity', label: 'Solidity' }, { id: 'sql', label: 'SQL' },
+  { id: 'stylus', label: 'Stylus' }, { id: 'svelte', label: 'Svelte' }, { id: 'swift', label: 'Swift' },
+  { id: 'toml', label: 'TOML' }, { id: 'tsx', label: 'React TSX' }, { id: 'twig', label: 'Pug' },
+  { id: 'typescript', label: 'TypeScript (ts)' }, { id: 'vbnet', label: 'VB.Net' }, { id: 'verilog', label: 'Verilog' },
+  { id: 'vhdl', label: 'Verilog' }, { id: 'vim', label: 'vim' }, { id: 'visual-basic', label: 'Visual Basic' },
+  { id: 'wasm', label: 'WebAssembly' }, { id: 'wiki', label: 'Wiki markup' }, { id: 'xml', label: 'XML' },
+  { id: 'yaml', label: 'YAML (yml)' }, { id: 'zig', label: 'Zig' }
+].sort((a, b) => a.label.localeCompare(b.label));
+
+// ==========================================
 // 💾 INDEXED-DB STORAGE WRAPPER
 // ==========================================
 const initDB = () => new Promise((resolve, reject) => {
@@ -60,7 +98,6 @@ const GistEmbed = ({ url, theme }) => {
   const gistUrl = url.includes('.js') ? url : `${url}.js`;
   const isDark = theme === 'dark';
   
-  // Dynamic CSS variables based on theme
   const colors = {
     bg: isDark ? '#0d1117' : '#ffffff',
     border: isDark ? '#30363d' : '#e5e7eb',
@@ -76,13 +113,21 @@ const GistEmbed = ({ url, theme }) => {
         <base target="_blank">
         <style>
           body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: ${colors.bg}; }
-          .gist .gist-file { border-radius: 8px; border: 1px solid ${colors.border} !important; margin: 0 !important; }
+          
+          /* Aggressive overrides for GitHub's latest HTML structure */
+          .gist .gist-file, .gist .Box, .gist .color-bg-default { 
+            border-radius: 8px; border: 1px solid ${colors.border} !important; margin: 0 !important; background-color: ${colors.bg} !important; 
+          }
           .gist .gist-data { background-color: ${colors.bg} !important; border-bottom: 1px solid ${colors.border} !important; }
-          .gist .blob-wrapper table { color: ${colors.text} !important; }
+          .gist .blob-wrapper table, .gist .blob-code, .gist .blob-code-inner { color: ${colors.text} !important; background-color: transparent !important; }
           .gist .blob-num { color: ${colors.metaText} !important; border-right: 1px solid ${colors.border} !important; background: transparent !important; }
+          
+          /* Syntax Highlighting overrides */
           .gist .pl-s { color: ${isDark ? '#a5d6ff' : '#0a3069'} !important; }
           .gist .pl-k { color: ${isDark ? '#ff7b72' : '#cf222e'} !important; }
           .gist .pl-en { color: ${isDark ? '#d2a8ff' : '#8250df'} !important; }
+          
+          /* Footer overrides */
           .gist .gist-meta { background-color: ${colors.metaBg} !important; color: ${colors.metaText} !important; font-size: 12px !important; border-radius: 0 0 8px 8px; padding: 10px !important; }
           .gist .gist-meta a { color: ${colors.link} !important; text-decoration: none; }
           .gist .gist-meta a:hover { text-decoration: underline; }
@@ -203,6 +248,17 @@ export default function App() {
   const [formContent, setFormContent] = useState("");
   const [formIsShared, setFormIsShared] = useState(false);
 
+  const resetFormFields = () => {
+    setFormTitle("");
+    setFormType("code");
+    setFormLang("javascript");
+    setFormTags("");
+    setFormContent("");
+    setFormIsShared(false);
+    setEditingSnippetId(null);
+    setIsAdding(false);
+  };
+
   // Theme effect
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
@@ -251,7 +307,6 @@ export default function App() {
   // INITIALIZATION & MERGE LOGIC
   useEffect(() => {
     const initializeApp = async () => {
-      // 1. Load Local Master Ledger
       let localData = await getLocalDb();
       if (!localData) localData = INITIAL_DB;
       
@@ -259,10 +314,8 @@ export default function App() {
       setActiveSection(Object.keys(localData)[0] || "");
       setFormSection(Object.keys(localData)[0] || "");
 
-      // 2. Fetch Public Bulletin Board
       try {
         setSyncStatus("Fetching live data...");
-        // Direct relative fetch. Falls back gracefully if running locally.
         const res = await fetch(GITHUB_CONFIG.PATH);
         
         if (res.status === 404) {
@@ -274,20 +327,17 @@ export default function App() {
         
         const remoteData = await res.json();
         
-        // 3. Upsert Logic: Merge Remote into Local
         const mergedDb = { ...localData };
         Object.keys(remoteData).forEach(section => {
           if (!mergedDb[section]) mergedDb[section] = [];
           
           remoteData[section].forEach(remoteSnippet => {
-            // Ensure legacy snippets have isShared flag
             const incomingSnippet = { ...remoteSnippet, isShared: remoteSnippet.isShared !== false };
-            
             const localIndex = mergedDb[section].findIndex(s => s.id === incomingSnippet.id);
             if (localIndex >= 0) {
-              mergedDb[section][localIndex] = incomingSnippet; // Update
+              mergedDb[section][localIndex] = incomingSnippet;
             } else {
-              mergedDb[section].push(incomingSnippet); // Insert
+              mergedDb[section].push(incomingSnippet);
             }
           });
         });
@@ -298,7 +348,7 @@ export default function App() {
       } catch (err) {
         console.error("Fetch skipped (likely dev environment):", err.message);
         setSyncStatus("Local mode (Remote unreachable).");
-        setLastSyncedDb(JSON.stringify(payloadDb)); // Prevent disabled button lock
+        setLastSyncedDb(JSON.stringify(payloadDb)); 
       }
     };
     initializeApp();
@@ -367,7 +417,6 @@ export default function App() {
     prismJs.async = true;
     
     prismJs.onload = () => {
-      // Load the autoloader plugin after core Prism loads
       const autoloader = document.createElement('script');
       autoloader.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js';
       autoloader.onload = () => {
@@ -385,7 +434,6 @@ export default function App() {
     if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll();
   }, [activeSnippet]);
 
-  // Loading Screen
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
   const sections = Object.keys(db);
@@ -445,9 +493,7 @@ export default function App() {
 
     setActiveSection(formSection);
     setActiveSnippet(snippetData);
-    setIsAdding(false);
-    setEditingSnippetId(null);
-    setFormTitle(""); setFormContent(""); setFormTags(""); setFormIsShared(false);
+    resetFormFields();
   };
 
   const handleAddSection = (e) => {
@@ -578,7 +624,11 @@ export default function App() {
               <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Toggle Theme">
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
-              <button onClick={() => { setFormSection(activeSection || sections[0] || ""); setFormIsShared(false); setIsAdding(true); }} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Add Snippet">
+              <button onClick={() => { 
+                resetFormFields();
+                setFormSection(activeSection || sections[0] || ""); 
+                setIsAdding(true); 
+              }} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Add Snippet">
                 <Plus size={16} />
               </button>
             </div>
@@ -726,7 +776,7 @@ export default function App() {
           <div className="bg-white dark:bg-[#161b22] w-full max-w-2xl rounded-xl shadow-2xl border border-gray-200 dark:border-[#30363d] overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-[#30363d]">
                <h3 className="text-lg font-semibold">{editingSnippetId ? 'Edit Snippet' : 'Add Snippet'}</h3>
-               <button onClick={() => { setIsAdding(false); setEditingSnippetId(null); }} className="text-gray-500 hover:text-gray-900 dark:text-[#8b949e] dark:hover:text-white"><X size={20} /></button>
+               <button onClick={() => resetFormFields()} className="text-gray-500 hover:text-gray-900 dark:text-[#8b949e] dark:hover:text-white"><X size={20} /></button>
             </div>
             <div className="overflow-y-auto">
               <form onSubmit={handleSaveSnippet} className="p-6 space-y-4">
@@ -749,9 +799,20 @@ export default function App() {
                       <option value="link">Web Link / Video URL</option>
                     </select>
                   </div>
-                  <div className={`w-1/3 ${formType === 'link' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className={`w-1/3 ${formType === 'link' || formType === 'gist' ? 'opacity-50 pointer-events-none' : ''}`}>
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
-                    <input type="text" value={formLang} onChange={e=>setFormLang(e.target.value)} disabled={formType === 'link'} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                    <input 
+                      type="text" 
+                      list="prism-languages"
+                      value={formLang} 
+                      onChange={e=>setFormLang(e.target.value)} 
+                      disabled={formType === 'link' || formType === 'gist'} 
+                      className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" 
+                      placeholder="e.g. javascript" 
+                    />
+                    <datalist id="prism-languages">
+                      {PRISM_LANGUAGES.map(lang => <option key={lang.id} value={lang.id}>{lang.label}</option>)}
+                    </datalist>
                   </div>
                   <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Tags (comma sep)</label>
@@ -775,7 +836,7 @@ export default function App() {
                   )}
                 </div>
                 <div className="flex justify-end pt-4 gap-3 border-t border-gray-200 dark:border-[#30363d] mt-4">
-                  <button type="button" onClick={() => { setIsAdding(false); setEditingSnippetId(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-transparent dark:border-[#30363d] rounded-md transition-colors">Cancel</button>
+                  <button type="button" onClick={() => resetFormFields()} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-transparent dark:border-[#30363d] rounded-md transition-colors">Cancel</button>
                   <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] rounded-md transition-colors flex items-center gap-2"><Save size={16} /> Save</button>
                 </div>
               </form>
