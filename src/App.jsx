@@ -3,7 +3,7 @@ import {
   Search, Folder, FileCode, Plus, Save, Copy, 
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
-  Link as LinkIcon, Terminal, FileText, Box
+  Link as LinkIcon, Terminal, FileText, Box, Image as ImageIcon, Film
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -96,25 +96,9 @@ const GistEmbed = ({ url, theme }) => {
 };
 
 const LinkViewer = ({ url }) => {
-  const [imgFailed, setImgFailed] = useState(false);
-
-  const isYoutube = url.includes('youtube.com/watch?v=') || url.includes('youtu.be/');
   const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf');
-  const isImage = url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i);
   
-  if (isYoutube) {
-    const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : url.split('youtu.be/')[1].split('?')[0];
-    return (
-      <div className="w-full max-w-4xl mx-auto h-full flex flex-col justify-center">
-        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-[#30363d] shadow-sm">
-          <iframe src={`https://www.youtube.com/embed/${videoId}`} className="absolute top-0 left-0 w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="YouTube Video" />
-        </div>
-      </div>
-    );
-  }
-
   if (isPdf) {
-    // Proxy through Google Docs Viewer to bypass strict origin CSP headers
     const proxyUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
     return (
       <div className="relative w-full h-full flex flex-col">
@@ -129,23 +113,6 @@ const LinkViewer = ({ url }) => {
     );
   }
 
-  if (isImage && !imgFailed) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-4 relative group">
-        <img 
-          src={url} 
-          alt="Embed" 
-          referrerPolicy="no-referrer" // Bypasses hotlink protection
-          onError={() => setImgFailed(true)} 
-          className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" 
-        />
-        <a href={url} target="_blank" rel="noreferrer" className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white px-3 py-2 rounded-lg text-xs flex items-center gap-2 backdrop-blur-sm hover:bg-black font-medium">
-          Open Original Image <ExternalLink size={12} />
-        </a>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
       <div className="p-8 bg-gray-50 dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-2xl max-w-lg w-full shadow-sm">
@@ -154,6 +121,44 @@ const LinkViewer = ({ url }) => {
         <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-6 line-clamp-2">{url}</p>
         <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] text-white text-sm font-medium rounded-lg transition-colors">Open Link <ExternalLink size={16} /></a>
       </div>
+    </div>
+  );
+};
+
+const ImageViewer = ({ url }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  if (imgFailed) return <LinkViewer url={url} />;
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center p-4 relative group">
+      <img 
+        src={url} 
+        alt="Embed" 
+        referrerPolicy="no-referrer" 
+        onError={() => setImgFailed(true)} 
+        className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" 
+      />
+      <a href={url} target="_blank" rel="noreferrer" className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white px-3 py-2 rounded-lg text-xs flex items-center gap-2 backdrop-blur-sm hover:bg-black font-medium">
+        Open Original Image <ExternalLink size={12} />
+      </a>
+    </div>
+  );
+};
+
+const VideoViewer = ({ url }) => {
+  const isYoutube = url.includes('youtube.com/watch?v=') || url.includes('youtu.be/');
+  if (isYoutube) {
+    const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : url.split('youtu.be/')[1].split('?')[0];
+    return (
+      <div className="w-full max-w-4xl mx-auto h-full flex flex-col justify-center">
+        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-[#30363d] shadow-sm">
+          <iframe src={`https://www.youtube.com/embed/${videoId}`} className="absolute top-0 left-0 w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="YouTube Video" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full h-full flex items-center justify-center p-4">
+      <video src={url} controls className="max-w-full max-h-full rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" />
     </div>
   );
 };
@@ -212,6 +217,7 @@ export default function App() {
   const [activeSection, setActiveSection] = useState("");
   const [activeSnippet, setActiveSnippet] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dragOverSection, setDragOverSection] = useState(null); // Track highlighted folder
   
   // External Languages State
   const [prismLanguages, setPrismLanguages] = useState([]);
@@ -422,6 +428,8 @@ export default function App() {
     switch (type) {
       case 'gist': return <Github size={size} />;
       case 'link': return <LinkIcon size={size} />;
+      case 'image': return <ImageIcon size={size} />;
+      case 'video': return <Film size={size} />;
       case 'sandbox': return <Box size={size} />;
       default: return <Code size={size} />;
     }
@@ -439,6 +447,26 @@ export default function App() {
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDropSnippet = (e, targetSection) => {
+    e.preventDefault();
+    setDragOverSection(null);
+    const snippetId = e.dataTransfer.getData('snippetId');
+    const sourceSection = e.dataTransfer.getData('sourceSection');
+    
+    if (!snippetId || !sourceSection || sourceSection === targetSection) return;
+    
+    setDb(prev => {
+      const newDb = { ...prev };
+      const snippetIndex = newDb[sourceSection].findIndex(s => s.id === snippetId);
+      if (snippetIndex === -1) return prev;
+      
+      const [snippetToMove] = newDb[sourceSection].splice(snippetIndex, 1);
+      newDb[targetSection].push(snippetToMove);
+      return newDb;
+    });
+    setActiveSection(targetSection);
   };
 
   const openEditSnippetModal = () => {
@@ -461,7 +489,7 @@ export default function App() {
     e.preventDefault();
     
     const finalLangId = prismLanguages.find(l => l.label === formLangInput)?.id || formLangInput.trim().toLowerCase();
-    const isUrlType = ['link', 'gist', 'sandbox'].includes(formType);
+    const isUrlType = ['link', 'gist', 'sandbox', 'image', 'video'].includes(formType);
 
     const snippetData = {
       id: editingSnippetId || Date.now().toString(),
@@ -609,9 +637,13 @@ export default function App() {
             <div className="px-4 text-xs font-semibold text-gray-500 dark:text-[#8b949e] uppercase tracking-wider mb-2">Collections</div>
             <nav className="space-y-0.5 px-2">
               {sections.map(section => (
-                <div key={section} className="relative group">
-                  <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]'}`}>
-                    <Folder size={16} className={activeSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
+                <div key={section} className="relative group"
+                     onDragOver={(e) => { e.preventDefault(); setDragOverSection(section); }}
+                     onDragLeave={() => setDragOverSection(null)}
+                     onDrop={(e) => handleDropSnippet(e, section)}
+                >
+                  <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${dragOverSection === section ? 'bg-blue-200 dark:bg-[#388bfd]/30' : (activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]')}`}>
+                    <Folder size={16} className={activeSection === section || dragOverSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
                     <span className="truncate flex-1 text-left">{section}</span>
                   </button>
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#161b22] px-1 rounded shadow-sm border border-gray-200 dark:border-transparent">
@@ -667,7 +699,14 @@ export default function App() {
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-[#21262d]">
               {filteredSnippets.map(snippet => (
-                <li key={snippet.id}>
+                <li key={snippet.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('snippetId', snippet.id);
+                      e.dataTransfer.setData('sourceSection', activeSection);
+                    }}
+                    className="cursor-grab active:cursor-grabbing"
+                >
                   <button onClick={() => { setActiveSnippet(snippet); setMdPreview(true); }} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
                       {getIconForType(snippet.type, snippet.language)}
@@ -704,7 +743,7 @@ export default function App() {
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs font-mono text-gray-500 dark:text-[#8b949e] uppercase flex items-center gap-1">
                     {getIconForType(activeSnippet.type, activeSnippet.language, 12)}
-                    {(!['link', 'sandbox'].includes(activeSnippet.type)) && (activeSnippet.language || activeSnippet.type)}
+                    {(!['link', 'sandbox', 'image', 'video'].includes(activeSnippet.type)) && (activeSnippet.language || activeSnippet.type)}
                   </span>
                   
                   {activeSnippet.type === 'code' && activeSnippet.language === 'markdown' && (
@@ -737,6 +776,10 @@ export default function App() {
                 )
               ) : activeSnippet.type === 'sandbox' ? (
                 <SandboxViewer url={activeSnippet.url} />
+              ) : activeSnippet.type === 'image' ? (
+                <ImageViewer url={activeSnippet.url} />
+              ) : activeSnippet.type === 'video' ? (
+                <VideoViewer url={activeSnippet.url} />
               ) : activeSnippet.type === 'link' ? (
                 <div className="h-full w-full py-4"><LinkViewer url={activeSnippet.url} /></div>
               ) : (
@@ -835,24 +878,26 @@ export default function App() {
                       onChange={e => {
                         const val = e.target.value;
                         setFormType(val);
-                        if (['sandbox', 'link', 'gist'].includes(val)) setFormLangInput("");
+                        if (['sandbox', 'link', 'gist', 'image', 'video'].includes(val)) setFormLangInput("");
                       }} 
                       className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none"
                     >
                       <option value="code">Raw Code</option>
+                      <option value="image">Image URL</option>
+                      <option value="video">Video URL</option>
                       <option value="sandbox">Code Sandbox (Embed)</option>
                       <option value="gist">GitHub Gist URL</option>
                       <option value="link">Web Link / Video URL</option>
                     </select>
                   </div>
-                  <div className={`w-1/3 ${['link', 'gist', 'sandbox'].includes(formType) ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className={`w-1/3 ${['link', 'gist', 'sandbox', 'image', 'video'].includes(formType) ? 'opacity-50 pointer-events-none' : ''}`}>
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
                     <input 
                       type="text" 
                       list="prism-languages"
                       value={formLangInput} 
                       onChange={e=>setFormLangInput(e.target.value)} 
-                      disabled={['link', 'gist', 'sandbox'].includes(formType)} 
+                      disabled={['link', 'gist', 'sandbox', 'image', 'video'].includes(formType)} 
                       className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none disabled:bg-gray-100 dark:disabled:bg-[#21262d]" 
                       placeholder="e.g. javascript" 
                     />
