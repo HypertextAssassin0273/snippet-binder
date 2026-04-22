@@ -219,7 +219,7 @@ export default function App() {
   const resetFormFields = () => {
     setFormTitle("");
     setFormType("code");
-    setFormLangInput(prismLanguages.find(l => l.id === 'javascript')?.label || "JavaScript (js)");
+    setFormLangInput("");
     setFormTags("");
     setFormContent("");
     setFormIsShared(false);
@@ -236,12 +236,9 @@ export default function App() {
       })
       .then(data => {
         setPrismLanguages(data);
-        if (!formLangInput) {
-          setFormLangInput(data.find(l => l.id === 'javascript')?.label || "JavaScript (js)");
-        }
       })
       .catch(err => console.warn("Failed to load languages.json. Using fallbacks.", err));
-  }, [formLangInput]);
+  }, []); // Run only once on mount
 
   // Theme effect
   useEffect(() => {
@@ -439,7 +436,7 @@ export default function App() {
     setFormType(activeSnippet.type);
     
     const foundLang = prismLanguages.find(l => l.id === activeSnippet.language);
-    setFormLangInput(foundLang ? foundLang.label : (activeSnippet.language || "JavaScript (js)"));
+    setFormLangInput(foundLang ? foundLang.label : (activeSnippet.language || ""));
     
     setFormTags(activeSnippet.tags.join(', '));
     setFormContent(activeSnippet.type === 'code' ? activeSnippet.content : activeSnippet.url);
