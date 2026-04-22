@@ -4,7 +4,8 @@ import {
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
   Link as LinkIcon, Terminal, FileText, Box, Image as ImageIcon, Film,
-  Settings, Download, Upload, CheckSquare, Square, SlidersHorizontal
+  Settings, Download, Upload, CheckSquare, Square, SlidersHorizontal,
+  FolderOpen, Eye, EyeOff
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -265,6 +266,7 @@ export default function App() {
 
   // Settings & Sync States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showToken, setShowToken] = useState(false);
   const [ghToken, setGhToken] = useState(getStoredToken);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
@@ -283,6 +285,8 @@ export default function App() {
   const [editingCollectionName, setEditingCollectionName] = useState(null);
   const [newCollectionNameInput, setNewCollectionNameInput] = useState("");
   const [deleteCollectionConfirm, setDeleteCollectionConfirm] = useState(null);
+  const [bulkMovePromptOpen, setBulkMovePromptOpen] = useState(false);
+  const [bulkMoveTarget, setBulkMoveTarget] = useState("");
 
   const [formSection, setFormSection] = useState("");
   const [formTitle, setFormTitle] = useState("");
@@ -516,21 +520,36 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleBulkAction = (action) => {
+  const handleBulkAction = (action, targetSection = null) => {
     setDb(prev => {
       const newDb = { ...prev };
+      
       if (action === 'delete') {
         newDb[activeSection] = newDb[activeSection].filter(s => !selectedIds.has(s.id));
         if (newDb[activeSection].length === 0) {
           delete newDb[activeSection];
           setActiveSection(Object.keys(newDb)[0] || "");
         }
-      } else {
+      } 
+      else if (action === 'move' && targetSection && targetSection !== activeSection) {
+        const snippetsToMove = newDb[activeSection].filter(s => selectedIds.has(s.id));
+        newDb[activeSection] = newDb[activeSection].filter(s => !selectedIds.has(s.id));
+        
+        if (!newDb[targetSection]) newDb[targetSection] = [];
+        newDb[targetSection] = [...newDb[targetSection], ...snippetsToMove];
+        
+        if (newDb[activeSection].length === 0) {
+          delete newDb[activeSection];
+          setActiveSection(targetSection);
+        }
+      } 
+      else {
         const isSharedTarget = action === 'share';
         newDb[activeSection] = newDb[activeSection].map(s => selectedIds.has(s.id) ? { ...s, isShared: isSharedTarget } : s);
       }
       return newDb;
     });
+    
     setSelectedIds(new Set());
     if (action === 'delete' && activeSnippet && selectedIds.has(activeSnippet.id)) setActiveSnippet(null);
   };
@@ -554,7 +573,7 @@ export default function App() {
     });
   })();
 
-  // --- Professional Search Engine (Relevance Scoring) ---
+  // --- Strict Search Engine ---
   const queryTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
   const filteredSnippets = (db[activeSection] || [])
     .map(s => {
@@ -567,21 +586,24 @@ export default function App() {
       const matchesAll = queryTokens.every(token => {
         let matched = false;
         
-        // Exact Tag Prefix Match (Highest Weight)
+        // Exact Tag Match (Highest Weight 50)
         if (s.tags.some(t => t.toLowerCase() === token)) { score += 50; matched = true; }
+        // Tag Prefix Match (Weight 20)
         else if (s.tags.some(t => t.toLowerCase().startsWith(token))) { score += 20; matched = true; }
         
-        // Strict Title Boundary Match
-        if (!matched && titleLower.includes(token)) {
+        if (!matched) {
+          const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           try {
-            if (new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(titleLower)) { score += 15; }
-            else { score += 10; }
-          } catch { score += 10; } // Fallback
-          matched = true;
+            const wordBoundaryRegex = new RegExp(`\\b${escapedToken}`, 'i');
+            // Strict Title Word-Prefix Match (Weight 15)
+            if (wordBoundaryRegex.test(titleLower)) { score += 15; matched = true; }
+            // Strict Content Word-Prefix Match (Weight 5)
+            else if (wordBoundaryRegex.test(contentLower)) { score += 5; matched = true; }
+          } catch (e) {
+            // Silently ignore regex errors from special characters
+            console.debug('Regex error during search:', e);
+          }
         }
-        
-        // Content Match
-        if (!matched && contentLower.includes(token)) { score += 1; matched = true; }
         
         return matched;
       });
@@ -589,7 +611,7 @@ export default function App() {
       return matchesAll ? { ...s, _score: score } : null;
     })
     .filter(Boolean)
-    .sort((a, b) => b._score - a._score); // Sort by highest relevance
+    .sort((a, b) => b._score - a._score); 
 
   const getIconForType = (type, language, size = 16) => {
     if (type === 'code' && language === 'markdown') return <FileText size={size} />;
@@ -885,6 +907,7 @@ export default function App() {
               <button onClick={() => { 
                 const newMode = !isSelectionMode;
                 setIsSelectionMode(newMode); 
+                setActiveSnippet(null); // Clear active snippet to prevent visual glitch
                 if (newMode && bulkSelectDefaultAll) {
                   setSelectedIds(new Set(filteredSnippets.map(s => s.id)));
                 } else {
@@ -913,6 +936,13 @@ export default function App() {
           <div className="bg-blue-50 dark:bg-[#1f6feb]/10 border-b border-blue-100 dark:border-[#1f6feb]/20 p-2 flex items-center justify-between shadow-sm z-10">
             <span className="text-xs font-semibold text-blue-700 dark:text-[#58a6ff] px-2">{selectedIds.size} Selected</span>
             <div className="flex gap-1">
+              <button onClick={() => {
+                const targets = displaySections.filter(s => s !== activeSection);
+                if(targets.length > 0) {
+                  setBulkMoveTarget(targets[0]);
+                  setBulkMovePromptOpen(true);
+                }
+              }} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Move to Collection"><FolderOpen size={12}/></button>
               <button onClick={() => handleBulkAction('share')} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Make Shareable"><Share2 size={12}/></button>
               <button onClick={() => handleBulkAction('private')} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Make Private"><Key size={12}/></button>
               <button onClick={() => handleBulkAction('delete')} className="px-2 py-1 text-xs bg-red-50 dark:bg-[#f85149]/10 border border-red-100 dark:border-[#f85149]/20 text-red-600 dark:text-[#f85149] rounded hover:bg-red-100 dark:hover:bg-[#f85149]/20" title="Delete"><Trash2 size={12}/></button>
@@ -948,7 +978,7 @@ export default function App() {
                       </button>
                     </div>
                   )}
-                  <button onClick={() => { if(!isSelectionMode) { setActiveSnippet(snippet); setMdPreview(true); } }} className={`flex-1 text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
+                  <button onClick={() => { if(!isSelectionMode) { setActiveSnippet(snippet); setMdPreview(true); } }} className={`flex-1 text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${(!isSelectionMode && activeSnippet?.id === snippet.id) ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
                       {getIconForType(snippet.type, snippet.language)}
                     </div>
@@ -1092,7 +1122,10 @@ export default function App() {
                       <div className="flex gap-2">
                         <div className="relative flex-1">
                           <Key className="absolute left-3 top-2.5 text-gray-400 dark:text-[#8b949e]" size={14} />
-                          <input type="password" value={ghToken} onChange={(e) => { setGhToken(e.target.value); localStorage.setItem('gh_token', e.target.value); }} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md pl-9 pr-3 py-1.5 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                          <input type={showToken ? "text" : "password"} value={ghToken} onChange={(e) => { setGhToken(e.target.value); localStorage.setItem('gh_token', e.target.value); }} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md pl-9 pr-10 py-1.5 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                          <button type="button" onClick={() => setShowToken(!showToken)} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                            {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
                         </div>
                         <button onClick={saveToGitHub} disabled={isSyncing || !ghToken || !hasChanges} className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors border ${isSyncing || !ghToken || !hasChanges ? 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-[#21262d] dark:text-[#8b949e] dark:border-[#30363d] cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white border-transparent dark:bg-[#238636] dark:hover:bg-[#2ea043] dark:border-[#2ea043]'}`}>
                           {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} {hasChanges ? 'Push Changes' : 'Up to date'}
@@ -1253,6 +1286,26 @@ export default function App() {
       )}
 
       {/* Simple Modals */}
+      {bulkMovePromptOpen && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#161b22] w-full max-w-sm rounded-xl shadow-2xl border border-gray-200 dark:border-[#30363d] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-[#30363d]">
+              <h3 className="text-lg font-semibold">Move Snippets</h3>
+            </div>
+            <div className="p-6">
+              <p className="mb-4 text-sm text-gray-700 dark:text-[#c9d1d9]">Select destination collection:</p>
+              <select value={bulkMoveTarget} onChange={e=>setBulkMoveTarget(e.target.value)} className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none mb-6">
+                <option value="" disabled>Select collection...</option>
+                {displaySections.filter(s => s !== activeSection).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setBulkMovePromptOpen(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] rounded-md">Cancel</button>
+                <button onClick={() => { handleBulkAction('move', bulkMoveTarget); setBulkMovePromptOpen(false); }} disabled={!bulkMoveTarget} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] rounded-md">Move</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {sectionPromptOpen && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-[#161b22] w-full max-w-sm rounded-xl shadow-2xl border border-gray-200 dark:border-[#30363d] overflow-hidden"><div className="px-6 py-4 border-b border-gray-200 dark:border-[#30363d]"><h3 className="text-lg font-semibold">New Collection</h3></div><form onSubmit={handleAddSection} className="p-6"><input autoFocus required type="text" value={newSectionName} onChange={e=>setNewSectionName(e.target.value)} className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none mb-6" /><div className="flex justify-end gap-3"><button type="button" onClick={() => setSectionPromptOpen(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] rounded-md">Cancel</button><button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] rounded-md">Create</button></div></form></div></div>
       )}
