@@ -96,6 +96,8 @@ const GistEmbed = ({ url, theme }) => {
 };
 
 const LinkViewer = ({ url }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+
   const isYoutube = url.includes('youtube.com/watch?v=') || url.includes('youtu.be/');
   const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf');
   const isImage = url.match(/\.(jpeg|jpg|gif|png|webp|svg)(\?.*)?$/i);
@@ -111,8 +113,38 @@ const LinkViewer = ({ url }) => {
     );
   }
 
-  if (isPdf) return <iframe src={url} className="w-full h-full border border-gray-200 dark:border-[#30363d] rounded-xl min-h-[500px]" title="PDF Viewer" />;
-  if (isImage) return <div className="w-full h-full flex items-center justify-center p-4"><img src={url} alt="Embed" className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" /></div>;
+  if (isPdf) {
+    // Proxy through Google Docs Viewer to bypass strict origin CSP headers
+    const proxyUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+    return (
+      <div className="relative w-full h-full flex flex-col">
+        <div className="bg-gray-50 dark:bg-[#161b22] p-2 border border-b-0 border-gray-200 dark:border-[#30363d] flex justify-between items-center rounded-t-xl shrink-0">
+          <span className="text-xs text-gray-500 dark:text-[#8b949e] font-mono truncate px-2">PDF Document</span>
+          <a href={url} target="_blank" rel="noreferrer" className="text-xs flex items-center gap-1 bg-blue-100 text-blue-700 dark:bg-[#1f6feb]/20 dark:text-[#58a6ff] px-3 py-1.5 rounded-md hover:bg-blue-200 dark:hover:bg-[#1f6feb]/40 transition-colors font-medium">
+            Open Externally <ExternalLink size={12} />
+          </a>
+        </div>
+        <iframe src={proxyUrl} className="w-full flex-1 border border-gray-200 dark:border-[#30363d] rounded-b-xl min-h-[500px] bg-white dark:bg-[#010409]" title="PDF Viewer" />
+      </div>
+    );
+  }
+
+  if (isImage && !imgFailed) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center p-4 relative group">
+        <img 
+          src={url} 
+          alt="Embed" 
+          referrerPolicy="no-referrer" // Bypasses hotlink protection
+          onError={() => setImgFailed(true)} 
+          className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" 
+        />
+        <a href={url} target="_blank" rel="noreferrer" className="absolute bottom-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white px-3 py-2 rounded-lg text-xs flex items-center gap-2 backdrop-blur-sm hover:bg-black font-medium">
+          Open Original Image <ExternalLink size={12} />
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
@@ -146,6 +178,31 @@ const MarkdownViewer = ({ content }) => {
         className="markdown-body max-w-4xl mx-auto"
         dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(content) : '<p>Loading renderer...</p>' }}
       />
+    </div>
+  );
+};
+
+const CliViewer = ({ content }) => {
+  return (
+    <div className="w-full h-full bg-[#0d1117] text-[#e6edf3] p-4 font-mono text-sm rounded-xl border border-gray-200 dark:border-[#30363d] overflow-auto shadow-sm mt-4">
+      <div className="flex gap-2 mb-4 border-b border-[#30363d] pb-3">
+        <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+        <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+        <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+      </div>
+      <pre className="whitespace-pre-wrap">
+        {content.split('\n').map((line, i) => {
+          const isPrompt = line.match(/^[$>]\s+/);
+          const prompt = isPrompt ? isPrompt[0] : '';
+          const text = line.substring(prompt.length);
+          return (
+            <div key={i} className="flex leading-relaxed hover:bg-[#161b22] px-1 rounded transition-colors">
+              <span className="text-[#3fb950] mr-2 select-none font-bold w-4 text-right">{prompt || '> '}</span>
+              <span className="text-[#e6edf3] break-all">{text}</span>
+            </div>
+          );
+        })}
+      </pre>
     </div>
   );
 };
@@ -671,6 +728,8 @@ export default function App() {
               {activeSnippet.type === 'code' ? (
                 (activeSnippet.language === 'markdown' && mdPreview) ? (
                   <MarkdownViewer content={activeSnippet.content} />
+                ) : activeSnippet.language === 'bash' || activeSnippet.language === 'shell' ? (
+                  <CliViewer content={activeSnippet.content} />
                 ) : (
                   <div className="prism-code-override h-full">
                     <pre className="h-full p-4 overflow-auto text-sm font-mono"><code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code></pre>
