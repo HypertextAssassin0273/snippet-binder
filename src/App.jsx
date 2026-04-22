@@ -25,107 +25,6 @@ const GITHUB_CONFIG = {
 };
 
 // ==========================================
-// 📚 SUPPORTED LANGUAGES (Native Datalist)
-// Any Prism ID can be typed; this is just the autocomplete dictionary.
-// ==========================================
-const PRISM_LANGUAGES = [
-  { id: 'abap', label: 'ABAP' },
-  { id: 'actionscript', label: 'ActionScript' },
-  { id: 'ada', label: 'Ada' },
-  { id: 'apex', label: 'Apex' },
-  { id: 'applescript', label: 'AppleScript' },
-  { id: 'asm6502', label: 'Assembly (6502)' },
-  { id: 'awk', label: 'AWK' },
-  { id: 'bash', label: 'Bash (shell, sh)' },
-  { id: 'basic', label: 'BASIC' },
-  { id: 'bicep', label: 'Bicep' },
-  { id: 'c', label: 'C' },
-  { id: 'clojure', label: 'Clojure' },
-  { id: 'cmake', label: 'CMake' },
-  { id: 'cobol', label: 'COBOL' },
-  { id: 'coffeescript', label: 'CoffeeScript' },
-  { id: 'cpp', label: 'C++ (cpp, cc)' },
-  { id: 'csharp', label: 'C# (cs, dotnet)' },
-  { id: 'css', label: 'CSS' },
-  { id: 'csv', label: 'CSV' },
-  { id: 'curl', label: 'cURL' },
-  { id: 'dart', label: 'Dart' },
-  { id: 'django', label: 'Django / Jinja2' },
-  { id: 'docker', label: 'Dockerfile (docker)' },
-  { id: 'elixir', label: 'Elixir' },
-  { id: 'elm', label: 'Elm' },
-  { id: 'erb', label: 'ERB' },
-  { id: 'erlang', label: 'Erlang' },
-  { id: 'fsharp', label: 'F# (fs)' },
-  { id: 'gdscript', label: 'GDScript' },
-  { id: 'glsl', label: 'GLSL' },
-  { id: 'go', label: 'Go (golang)' },
-  { id: 'graphql', label: 'GraphQL (gql)' },
-  { id: 'groovy', label: 'Groovy' },
-  { id: 'haskell', label: 'Haskell' },
-  { id: 'haxe', label: 'Haxe' },
-  { id: 'html', label: 'HTML (markup)' },
-  { id: 'http', label: 'HTTP' },
-  { id: 'ini', label: 'INI' },
-  { id: 'java', label: 'Java' },
-  { id: 'javascript', label: 'JavaScript (js)' },
-  { id: 'json', label: 'JSON' },
-  { id: 'jsx', label: 'React JSX (jsx)' },
-  { id: 'julia', label: 'Julia' },
-  { id: 'kotlin', label: 'Kotlin' },
-  { id: 'latex', label: 'LaTeX (tex)' },
-  { id: 'less', label: 'Less' },
-  { id: 'lisp', label: 'Lisp' },
-  { id: 'lua', label: 'Lua' },
-  { id: 'makefile', label: 'Makefile' },
-  { id: 'markdown', label: 'Markdown (md)' },
-  { id: 'matlab', label: 'MATLAB' },
-  { id: 'nginx', label: 'nginx' },
-  { id: 'nim', label: 'Nim' },
-  { id: 'nix', label: 'Nix' },
-  { id: 'objectivec', label: 'Objective-C (objc)' },
-  { id: 'ocaml', label: 'OCaml' },
-  { id: 'pascal', label: 'Pascal' },
-  { id: 'perl', label: 'Perl' },
-  { id: 'php', label: 'PHP' },
-  { id: 'plain', label: 'Plain Text (txt)' },
-  { id: 'powershell', label: 'PowerShell (ps1)' },
-  { id: 'prolog', label: 'Prolog' },
-  { id: 'properties', label: '.properties' },
-  { id: 'protobuf', label: 'Protocol Buffers (protobuf)' },
-  { id: 'pug', label: 'Pug' },
-  { id: 'python', label: 'Python (py)' },
-  { id: 'qml', label: 'QML' },
-  { id: 'r', label: 'R' },
-  { id: 'regex', label: 'Regex' },
-  { id: 'ruby', label: 'Ruby (rb)' },
-  { id: 'rust', label: 'Rust (rs)' },
-  { id: 'sass', label: 'Sass' },
-  { id: 'scala', label: 'Scala' },
-  { id: 'scheme', label: 'Scheme' },
-  { id: 'scss', label: 'SCSS' },
-  { id: 'solidity', label: 'Solidity (sol)' },
-  { id: 'sql', label: 'SQL' },
-  { id: 'stylus', label: 'Stylus' },
-  { id: 'svelte', label: 'Svelte' },
-  { id: 'swift', label: 'Swift' },
-  { id: 'toml', label: 'TOML' },
-  { id: 'tsx', label: 'React TSX (tsx)' },
-  { id: 'twig', label: 'Twig' },
-  { id: 'typescript', label: 'TypeScript (ts)' },
-  { id: 'vbnet', label: 'VB.Net' },
-  { id: 'verilog', label: 'Verilog' },
-  { id: 'vhdl', label: 'VHDL' },
-  { id: 'vim', label: 'Vim' },
-  { id: 'visual-basic', label: 'Visual Basic (vb)' },
-  { id: 'wasm', label: 'WebAssembly (wasm)' },
-  { id: 'wiki', label: 'Wiki markup' },
-  { id: 'xml', label: 'XML / SVG' },
-  { id: 'yaml', label: 'YAML (yml)' },
-  { id: 'zig', label: 'Zig' }
-].sort((a, b) => a.label.localeCompare(b.label));
-
-// ==========================================
 // 💾 INDEXED-DB STORAGE WRAPPER
 // ==========================================
 const initDB = () => new Promise((resolve, reject) => {
@@ -250,7 +149,6 @@ const LinkViewer = ({ url }) => {
     );
   }
 
-  // Fallback for generic links
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
       <div className="p-8 bg-gray-50 dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-2xl max-w-lg w-full shadow-sm">
@@ -275,6 +173,13 @@ export default function App() {
   const [activeSection, setActiveSection] = useState("");
   const [activeSnippet, setActiveSnippet] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // External Languages State with fallback
+  const [prismLanguages, setPrismLanguages] = useState([
+    { id: 'javascript', label: 'JavaScript (js)' },
+    { id: 'python', label: 'Python (py)' },
+    { id: 'plain', label: 'Plain Text (txt)' }
+  ]);
   
   // Layout States
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -306,7 +211,7 @@ export default function App() {
   const [formSection, setFormSection] = useState("");
   const [formTitle, setFormTitle] = useState("");
   const [formType, setFormType] = useState("code");
-  const [formLang, setFormLang] = useState("javascript");
+  const [formLangInput, setFormLangInput] = useState(""); 
   const [formTags, setFormTags] = useState("");
   const [formContent, setFormContent] = useState("");
   const [formIsShared, setFormIsShared] = useState(false);
@@ -314,13 +219,29 @@ export default function App() {
   const resetFormFields = () => {
     setFormTitle("");
     setFormType("code");
-    setFormLang("javascript");
+    setFormLangInput(prismLanguages.find(l => l.id === 'javascript')?.label || "JavaScript (js)");
     setFormTags("");
     setFormContent("");
     setFormIsShared(false);
     setEditingSnippetId(null);
     setIsAdding(false);
   };
+
+  // Fetch external language config
+  useEffect(() => {
+    fetch('./languages.json')
+      .then(res => {
+        if (!res.ok) throw new Error('Network response failed');
+        return res.json();
+      })
+      .then(data => {
+        setPrismLanguages(data);
+        if (!formLangInput) {
+          setFormLangInput(data.find(l => l.id === 'javascript')?.label || "JavaScript (js)");
+        }
+      })
+      .catch(err => console.warn("Failed to load languages.json. Using fallbacks.", err));
+  }, [formLangInput]);
 
   // Theme effect
   useEffect(() => {
@@ -420,7 +341,7 @@ export default function App() {
 
   const saveToGitHub = async () => {
     if (!ghToken || !GITHUB_CONFIG.OWNER) {
-      return alert("Please update GITHUB_CONFIG and provide a Token.");
+      return alert("Please check configuration and Token.");
     }
     
     setIsSyncing(true);
@@ -516,7 +437,10 @@ export default function App() {
     if (!activeSnippet) return;
     setFormTitle(activeSnippet.title);
     setFormType(activeSnippet.type);
-    setFormLang(activeSnippet.language || "javascript");
+    
+    const foundLang = prismLanguages.find(l => l.id === activeSnippet.language);
+    setFormLangInput(foundLang ? foundLang.label : (activeSnippet.language || "JavaScript (js)"));
+    
     setFormTags(activeSnippet.tags.join(', '));
     setFormContent(activeSnippet.type === 'code' ? activeSnippet.content : activeSnippet.url);
     setFormSection(activeSection);
@@ -527,11 +451,14 @@ export default function App() {
 
   const handleSaveSnippet = (e) => {
     e.preventDefault();
+    
+    const finalLangId = prismLanguages.find(l => l.label === formLangInput)?.id || formLangInput.trim().toLowerCase();
+
     const snippetData = {
       id: editingSnippetId || Date.now().toString(),
       title: formTitle,
       type: formType,
-      language: formLang,
+      language: finalLangId,
       tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
       isShared: formIsShared,
       ...(formType === 'code' ? { content: formContent } : { url: formContent })
@@ -867,14 +794,14 @@ export default function App() {
                     <input 
                       type="text" 
                       list="prism-languages"
-                      value={formLang} 
-                      onChange={e=>setFormLang(e.target.value)} 
+                      value={formLangInput} 
+                      onChange={e=>setFormLangInput(e.target.value)} 
                       disabled={formType === 'link' || formType === 'gist'} 
                       className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" 
                       placeholder="e.g. javascript" 
                     />
                     <datalist id="prism-languages">
-                      {PRISM_LANGUAGES.map(lang => <option key={lang.id} value={lang.id}>{lang.label}</option>)}
+                      {prismLanguages.map(lang => <option key={lang.id} value={lang.label} />)}
                     </datalist>
                   </div>
                   <div className="w-1/3">
