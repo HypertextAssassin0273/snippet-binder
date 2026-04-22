@@ -5,7 +5,7 @@ import {
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
   Link as LinkIcon, Terminal, FileText, Box, Image as ImageIcon, Film,
   Settings, Download, Upload, CheckSquare, Square, SlidersHorizontal,
-  FolderOpen, Eye, EyeOff
+  FolderOpen, Eye, EyeOff, Pin, History, WrapText, ListOrdered, RotateCcw
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -215,7 +215,6 @@ const CliViewer = ({ content }) => {
       </div>
       <pre className="whitespace-pre-wrap">
         {content.split('\n').map((line, i) => {
-          // Supports standard unix prompts ($/ >) and Windows/Powershell paths (C:\..> / PS C:\..>)
           const isPrompt = line.match(/^([$>]|PS\s+[^>]+>|[A-Z]:\\[^>]*>)\s*/i);
           const prompt = isPrompt ? isPrompt[0] : '';
           const text = line.substring(prompt.length);
@@ -260,6 +259,15 @@ export default function App() {
   const [collectionSortOrder, setCollectionSortOrder] = useState(() => {
     try { return localStorage.getItem('collectionSortOrder') || 'asc'; } catch { return 'asc'; }
   });
+  const [maxPins, setMaxPins] = useState(() => {
+    try { return parseInt(localStorage.getItem('maxPins')) || 3; } catch { return 3; }
+  });
+  const [wordWrap, setWordWrap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('wordWrap')) || false; } catch { return false; }
+  });
+  const [lineNumbers, setLineNumbers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lineNumbers')) || false; } catch { return false; }
+  });
 
   // Settings & Sync States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -285,6 +293,8 @@ export default function App() {
   const [bulkMovePromptOpen, setBulkMovePromptOpen] = useState(false);
   const [bulkMoveTarget, setBulkMoveTarget] = useState("");
   const [bulkMoveNewCol, setBulkMoveNewCol] = useState("");
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedRevision, setSelectedRevision] = useState(null);
 
   const [formSection, setFormSection] = useState("");
   const [formTitle, setFormTitle] = useState("");
@@ -311,6 +321,9 @@ export default function App() {
   useEffect(() => { localStorage.setItem('theme', theme); }, [theme]);
   useEffect(() => { localStorage.setItem('bulkSelectDefaultAll', JSON.stringify(bulkSelectDefaultAll)); }, [bulkSelectDefaultAll]);
   useEffect(() => { localStorage.setItem('collectionSortOrder', collectionSortOrder); }, [collectionSortOrder]);
+  useEffect(() => { localStorage.setItem('maxPins', maxPins); }, [maxPins]);
+  useEffect(() => { localStorage.setItem('wordWrap', JSON.stringify(wordWrap)); }, [wordWrap]);
+  useEffect(() => { localStorage.setItem('lineNumbers', JSON.stringify(lineNumbers)); }, [lineNumbers]);
   
   // Apply DOM Theme
   useEffect(() => {
@@ -324,17 +337,25 @@ export default function App() {
     prismCss.rel = 'stylesheet';
     prismCss.href = theme === 'dark' ? 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css' : 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
     document.head.appendChild(prismCss);
+    
+    // Load Line Numbers CSS
+    const lnCss = document.createElement('link');
+    lnCss.rel = 'stylesheet';
+    lnCss.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css';
+    document.head.appendChild(lnCss);
+
     const prismJs = document.createElement('script');
     prismJs.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js';
     prismJs.async = true;
     prismJs.onload = () => {
       const autoloader = document.createElement('script');
       autoloader.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js';
-      autoloader.onload = () => {
-        window.Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
-        window.Prism?.highlightAll();
-      };
       document.body.appendChild(autoloader);
+      
+      const lnJs = document.createElement('script');
+      lnJs.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js';
+      lnJs.onload = () => window.Prism?.highlightAll();
+      document.body.appendChild(lnJs);
     };
     document.body.appendChild(prismJs);
 
@@ -344,7 +365,11 @@ export default function App() {
       document.body.appendChild(markedJs);
     }
 
-    return () => { document.head.removeChild(prismCss); document.body.removeChild(prismJs); };
+    return () => { 
+      document.head.removeChild(prismCss); 
+      document.head.removeChild(lnCss);
+      document.body.removeChild(prismJs); 
+    };
   }, [theme]);
 
   // Fetch and validate languages
@@ -551,7 +576,55 @@ export default function App() {
     if (action === 'delete' && activeSnippet && selectedIds.has(activeSnippet.id)) setActiveSnippet(null);
   };
 
-  useEffect(() => { if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll(); }, [activeSnippet, mdPreview]);
+  // Re-run prism highlighting on lineNumbers or code changes
+  useEffect(() => { 
+    if (activeSnippet && activeSnippet.type === 'code' && window.Prism) {
+      window.Prism.highlightAll(); 
+    }
+  }, [activeSnippet, mdPreview, lineNumbers]);
+
+  const togglePin = () => {
+    if (!activeSnippet) return;
+    if (!activeSnippet.isPinned) {
+      const currentPins = db[activeSection].filter(s => s.isPinned).length;
+      if (currentPins >= maxPins) {
+        return alert(`Maximum of ${maxPins} pinned snippets reached for this collection.`);
+      }
+    }
+    
+    const updated = { ...activeSnippet, isPinned: !activeSnippet.isPinned };
+    setDb(prev => ({
+      ...prev,
+      [activeSection]: prev[activeSection].map(s => s.id === updated.id ? updated : s)
+    }));
+    setActiveSnippet(updated);
+  };
+
+  const handleRestoreRevision = () => {
+    if (!activeSnippet || !selectedRevision) return;
+    if (!window.confirm("Restore this version? Your current content will be saved to history.")) return;
+
+    const currentContent = ['link', 'gist', 'sandbox', 'image', 'video'].includes(activeSnippet.type) ? activeSnippet.url : activeSnippet.content;
+    const isUrlType = ['link', 'gist', 'sandbox', 'image', 'video'].includes(activeSnippet.type);
+    
+    let newRevisions = activeSnippet.revisions ? [...activeSnippet.revisions] : [];
+    newRevisions = newRevisions.filter(r => r.ts !== selectedRevision.ts); // Remove the one we are restoring
+    newRevisions.unshift({ ts: Date.now(), content: currentContent }); // Save current state
+    newRevisions = newRevisions.slice(0, 5);
+
+    const updated = { 
+      ...activeSnippet, 
+      ...(isUrlType ? { url: selectedRevision.content } : { content: selectedRevision.content }),
+      revisions: newRevisions 
+    };
+
+    setDb(prev => ({
+      ...prev,
+      [activeSection]: prev[activeSection].map(s => s.id === updated.id ? updated : s)
+    }));
+    setActiveSnippet(updated);
+    setHistoryModalOpen(false);
+  };
 
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
@@ -560,7 +633,7 @@ export default function App() {
     const secs = Object.keys(db);
     if (collectionSortOrder === 'asc') return [...secs].sort((a, b) => a.localeCompare(b));
     if (collectionSortOrder === 'desc') return [...secs].sort((a, b) => b.localeCompare(a));
-    return secs; // Native DB schema order acts as Custom Order
+    return secs; 
   })();
 
   // --- Strict Search Engine ---
@@ -576,18 +649,14 @@ export default function App() {
       const matchesAll = queryTokens.every(token => {
         let matched = false;
         
-        // Exact Tag Match (Highest Weight 50)
         if (s.tags.some(t => t.toLowerCase() === token)) { score += 50; matched = true; }
-        // Tag Prefix Match (Weight 20)
         else if (s.tags.some(t => t.toLowerCase().startsWith(token))) { score += 20; matched = true; }
         
         if (!matched) {
           const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           try {
             const wordBoundaryRegex = new RegExp(`\\b${escapedToken}`, 'i');
-            // Strict Title Word-Prefix Match (Weight 15)
             if (wordBoundaryRegex.test(titleLower)) { score += 15; matched = true; }
-            // Strict Content Word-Prefix Match (Weight 5)
             else if (wordBoundaryRegex.test(contentLower)) { score += 5; matched = true; }
           } catch (e) {
             // Silently ignore regex errors from special characters
@@ -601,7 +670,13 @@ export default function App() {
       return matchesAll ? { ...s, _score: score } : null;
     })
     .filter(Boolean)
-    .sort((a, b) => b._score - a._score); 
+    .sort((a, b) => {
+       // Pinned items always float to top if not strictly searching
+       if (queryTokens.length === 0) {
+         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+       }
+       return b._score - a._score;
+    }); 
 
   const getIconForType = (type, language, size = 16) => {
     if (type === 'code' && language === 'markdown') return <FileText size={size} />;
@@ -660,7 +735,6 @@ export default function App() {
             keys.splice(srcIdx, 1);
             keys.splice(tgtIdx, 0, sourceCol);
 
-            // Reconstruct object in new order (JSON format inherently saves this physical order)
             const orderedDb = {};
             keys.forEach(k => { orderedDb[k] = prev[k] });
             return orderedDb;
@@ -693,6 +767,24 @@ export default function App() {
     
     const finalLangId = prismLanguages.find(l => l.label === formLangInput)?.id || formLangInput.trim().toLowerCase();
     const finalType = formCategory === 'url' ? formUrlType : 'code';
+    
+    const isEdit = !!editingSnippetId;
+    const oldSnippet = isEdit ? db[formSection]?.find(s => s.id === editingSnippetId) : null;
+    let revisions = oldSnippet?.revisions || [];
+    
+    const currentContent = formCategory === 'url' ? formContent : formContent;
+    
+    // Space-efficient array history
+    if (oldSnippet) {
+       const oldContent = ['link', 'gist', 'sandbox', 'image', 'video'].includes(oldSnippet.type) ? oldSnippet.url : oldSnippet.content;
+       if (oldContent !== currentContent) {
+          revisions.unshift({
+             ts: Date.now(),
+             content: oldContent
+          });
+          revisions = revisions.slice(0, 5); // Max 5 edits
+       }
+    }
 
     const snippetData = {
       id: editingSnippetId || Date.now().toString(),
@@ -701,6 +793,8 @@ export default function App() {
       language: finalLangId,
       tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
       isShared: formIsShared,
+      isPinned: oldSnippet ? oldSnippet.isPinned : false,
+      revisions: revisions,
       ...(formCategory === 'url' ? { url: formContent } : { content: formContent })
     };
 
@@ -805,8 +899,13 @@ export default function App() {
         .dark ::-webkit-scrollbar-thumb { background: #30363d; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .dark ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+        
+        /* Code View Options OVERRIDES */
         .prism-code-override pre { margin: 0 !important; border-radius: 0.5rem !important; background: #f8fafc !important; border: 1px solid #e2e8f0; height: 100%; color: #334155; }
         .dark .prism-code-override pre { background: #010409 !important; border: 1px solid #30363d; color: #c9d1d9; }
+        .prism-code-override .line-numbers .line-numbers-rows { border-right: 1px solid #e2e8f0; padding-left: 10px; }
+        .dark .prism-code-override .line-numbers .line-numbers-rows { border-right: 1px solid #30363d; }
+        .prism-code-override pre.line-numbers { padding-left: 3.8em !important; }
         
         /* Markdown Viewer Styles */
         .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; color: inherit; }
@@ -992,7 +1091,10 @@ export default function App() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
-                        <h3 className="font-medium text-sm truncate pr-2">{snippet.title}</h3>
+                        <div className="flex items-center gap-1.5 pr-2 truncate">
+                           {snippet.isPinned && <Pin size={12} className="text-yellow-500 fill-current flex-shrink-0" />}
+                           <h3 className="font-medium text-sm truncate">{snippet.title}</h3>
+                        </div>
                         {snippet.isShared && <Share2 size={12} className="text-blue-500 dark:text-[#58a6ff] flex-shrink-0 mt-1" title="Shared Snippet" />}
                       </div>
                       <div className="flex gap-1.5 flex-wrap">
@@ -1036,21 +1138,30 @@ export default function App() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button onClick={openEditSnippetModal} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md"><Edit2 size={18} /></button>
-                <button onClick={handleCopy} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md">{copied ? <CheckCircle size={18} className="text-green-600 dark:text-[#3fb950]" /> : <Copy size={18} />}</button>
-                <button onClick={() => setDeleteConfirmId(activeSnippet.id)} className="p-2 text-red-500 hover:bg-red-50 dark:text-[#f85149] dark:hover:bg-[#f85149]/10 rounded-md"><Trash2 size={18} /></button>
+                <button onClick={togglePin} className={`p-2 rounded-md transition-colors ${activeSnippet.isPinned ? 'text-yellow-500 bg-yellow-50 dark:bg-yellow-500/10' : 'text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d]'}`} title={activeSnippet.isPinned ? "Unpin Snippet" : "Pin to Top"}><Pin size={18} className={activeSnippet.isPinned ? "fill-current" : ""} /></button>
+                <button onClick={() => setHistoryModalOpen(true)} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md" title="Revision History"><History size={18} /></button>
+                <button onClick={openEditSnippetModal} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md" title="Edit Snippet"><Edit2 size={18} /></button>
+                <button onClick={handleCopy} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md" title="Copy Content">{copied ? <CheckCircle size={18} className="text-green-600 dark:text-[#3fb950]" /> : <Copy size={18} />}</button>
+                <button onClick={() => setDeleteConfirmId(activeSnippet.id)} className="p-2 text-red-500 hover:bg-red-50 dark:text-[#f85149] dark:hover:bg-[#f85149]/10 rounded-md" title="Delete Snippet"><Trash2 size={18} /></button>
               </div>
             </div>
 
-            <div className="flex-1 p-4 overflow-y-auto bg-white dark:bg-[#0d1117]">
+            <div className="flex-1 overflow-y-auto bg-white dark:bg-[#0d1117] flex flex-col relative">
               {activeSnippet.type === 'code' ? (
                 (activeSnippet.language === 'markdown' && mdPreview) ? (
                   <MarkdownViewer content={activeSnippet.content} />
                 ) : isCliLanguage(activeSnippet.language) ? (
                   <CliViewer content={activeSnippet.content} />
                 ) : (
-                  <div className="prism-code-override h-full">
-                    <pre className="h-full p-4 overflow-auto text-sm font-mono"><code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code></pre>
+                  <div className="prism-code-override h-full flex flex-col relative">
+                    {/* Code View Options Bar */}
+                    <div className="absolute right-6 top-4 flex gap-1 z-10 opacity-60 hover:opacity-100 transition-opacity">
+                      <button onClick={() => setWordWrap(!wordWrap)} className={`p-1.5 rounded-md border ${wordWrap ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-[#1f6feb]/30 dark:text-[#58a6ff] dark:border-[#1f6feb]/50' : 'bg-white text-gray-500 border-gray-300 dark:bg-[#21262d] dark:text-[#8b949e] dark:border-[#30363d] hover:bg-gray-50 dark:hover:bg-[#30363d]'}`} title="Toggle Word Wrap"><WrapText size={14}/></button>
+                      <button onClick={() => setLineNumbers(!lineNumbers)} className={`p-1.5 rounded-md border ${lineNumbers ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-[#1f6feb]/30 dark:text-[#58a6ff] dark:border-[#1f6feb]/50' : 'bg-white text-gray-500 border-gray-300 dark:bg-[#21262d] dark:text-[#8b949e] dark:border-[#30363d] hover:bg-gray-50 dark:hover:bg-[#30363d]'}`} title="Toggle Line Numbers"><ListOrdered size={14}/></button>
+                    </div>
+                    <pre className={`h-full p-4 overflow-auto text-sm font-mono ${lineNumbers ? 'line-numbers' : ''}`} style={{ whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}>
+                      <code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code>
+                    </pre>
                   </div>
                 )
               ) : activeSnippet.type === 'sandbox' ? (
@@ -1062,7 +1173,7 @@ export default function App() {
               ) : activeSnippet.type === 'link' ? (
                 <div className="h-full w-full py-4"><LinkViewer url={activeSnippet.url} /></div>
               ) : (
-                <div className="h-full flex flex-col">
+                <div className="h-full flex flex-col p-4">
                   <div className="bg-gray-50 dark:bg-[#161b22] px-4 py-2 flex items-center gap-2 border border-gray-200 dark:border-[#30363d] border-b-0 rounded-t-lg">
                     <Github size={16} className="text-gray-600 dark:text-[#c9d1d9]" />
                     <span className="text-xs text-gray-500 dark:text-[#8b949e] font-mono truncate flex-grow">{activeSnippet.url}</span>
@@ -1082,6 +1193,52 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* HISTORY MODAL */}
+      {historyModalOpen && activeSnippet && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#161b22] w-full max-w-4xl rounded-xl shadow-2xl border border-gray-200 dark:border-[#30363d] overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117]">
+               <h3 className="text-lg font-semibold flex items-center gap-2"><History size={18}/> Revision History</h3>
+               <button onClick={() => { setHistoryModalOpen(false); setSelectedRevision(null); }} className="text-gray-500 hover:text-gray-900 dark:text-[#8b949e] dark:hover:text-white"><X size={20} /></button>
+            </div>
+            
+            <div className="flex flex-1 overflow-hidden min-h-[500px]">
+              <div className="w-1/3 border-r border-gray-200 dark:border-[#30363d] overflow-y-auto bg-gray-50 dark:bg-[#161b22]">
+                {(!activeSnippet.revisions || activeSnippet.revisions.length === 0) ? (
+                  <div className="p-6 text-sm text-gray-500 dark:text-[#8b949e] text-center">No history available for this snippet.</div>
+                ) : (
+                  <ul className="divide-y divide-gray-200 dark:divide-[#30363d]">
+                    {activeSnippet.revisions.map((rev, idx) => (
+                      <li key={rev.ts}>
+                        <button onClick={() => setSelectedRevision(rev)} className={`w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-[#21262d] transition-colors ${selectedRevision?.ts === rev.ts ? 'bg-blue-50 dark:bg-[#1f6feb]/10 border-l-2 border-blue-500 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">Revision {activeSnippet.revisions.length - idx}</div>
+                          <div className="text-xs text-gray-500 dark:text-[#8b949e] mt-1">{new Date(rev.ts).toLocaleString()}</div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="w-2/3 flex flex-col bg-white dark:bg-[#0d1117]">
+                {selectedRevision ? (
+                   <>
+                     <div className="p-4 border-b border-gray-200 dark:border-[#30363d] flex justify-between items-center bg-gray-50 dark:bg-[#161b22]">
+                       <span className="text-sm font-medium">Previewing Revision</span>
+                       <button onClick={handleRestoreRevision} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center gap-2"><RotateCcw size={14}/> Restore Version</button>
+                     </div>
+                     <div className="p-4 flex-1 overflow-auto font-mono text-sm whitespace-pre-wrap text-gray-800 dark:text-[#c9d1d9]">
+                       {selectedRevision.content}
+                     </div>
+                   </>
+                ) : (
+                   <div className="flex-1 flex items-center justify-center text-sm text-gray-500 dark:text-[#8b949e]">Select a revision from the left to preview.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SETTINGS / DATA MODAL */}
       {isSettingsOpen && (
@@ -1187,6 +1344,19 @@ export default function App() {
                       <option value="custom">Custom (Drag & Drop)</option>
                     </select>
                   </div>
+
+                  <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
+                    <div>
+                      <h5 className="font-medium text-sm">Maximum Pins per Collection</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">Limit how many snippets can be pinned to the top.</p>
+                    </div>
+                    <select value={maxPins} onChange={(e) => setMaxPins(parseInt(e.target.value))} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                      <option value="3">3 Pins</option>
+                      <option value="4">4 Pins</option>
+                      <option value="5">5 Pins</option>
+                    </select>
+                  </div>
+
                 </div>
               </div>
 
