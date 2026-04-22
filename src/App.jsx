@@ -128,7 +128,6 @@ const LinkViewer = ({ url }) => {
 
 const SandboxViewer = ({ url }) => {
   let embedUrl = url;
-  // Intelligently transform raw URLs to their embed counterparts
   if (url.includes('codepen.io') && url.includes('/pen/')) embedUrl = url.replace('/pen/', '/embed/');
   else if (url.includes('codesandbox.io/s/')) embedUrl = url.replace('/s/', '/embed/');
   else if (url.includes('stackblitz.com/edit/') && !url.includes('embed=1')) embedUrl = url + (url.includes('?') ? '&' : '?') + 'embed=1';
@@ -161,7 +160,7 @@ const CliViewer = ({ content }) => {
       </div>
       <pre className="whitespace-pre-wrap">
         {content.split('\n').map((line, i) => {
-          const isPrompt = line.match(/^[\$>]?\s*/);
+          const isPrompt = line.match(/^[$>]?\s*/);
           const prompt = isPrompt ? isPrompt[0] : '';
           const text = line.substring(prompt.length);
           return (
@@ -233,7 +232,6 @@ export default function App() {
 
   // Dynamic Component Loaders (Prism + Marked)
   useEffect(() => {
-    // 1. Prism
     const prismCss = document.createElement('link');
     prismCss.rel = 'stylesheet';
     prismCss.href = theme === 'dark' ? 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css' : 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
@@ -252,7 +250,6 @@ export default function App() {
     };
     document.body.appendChild(prismJs);
 
-    // 2. Marked.js (for Markdown Viewer)
     if (!window.marked) {
       const markedJs = document.createElement('script');
       markedJs.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
@@ -274,13 +271,6 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => { if (db !== null) setLocalDb(db); }, [db]);
-
-  // Auto-fill language input based on specific types
-  useEffect(() => {
-    if (formType === 'markdown') setFormLangInput("Markdown (md)");
-    else if (formType === 'cli') setFormLangInput("Bash (shell, sh)");
-    else if (formType === 'sandbox' || formType === 'link' || formType === 'gist') setFormLangInput("");
-  }, [formType]);
 
   // Handle Drag Resizing
   useEffect(() => {
@@ -343,6 +333,7 @@ export default function App() {
         setLastSyncedDb(JSON.stringify(remoteData));
         setSyncStatus("");
       } catch (err) {
+        console.warn("Local mode fallback:", err.message);
         setSyncStatus("Local mode (Remote unreachable).");
         setLastSyncedDb(JSON.stringify(payloadDb)); 
       }
@@ -409,7 +400,7 @@ export default function App() {
     
     // Smart copy: Strip CLI prompts
     if (activeSnippet.type === 'cli') {
-      textToCopy = textToCopy.replace(/^[\$>]?\s*/gm, '');
+      textToCopy = textToCopy.replace(/^[$>]?\s*/gm, '');
     }
     
     navigator.clipboard.writeText(textToCopy);
@@ -793,7 +784,17 @@ export default function App() {
                 <div className="flex gap-4">
                   <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Source Type</label>
-                    <select value={formType} onChange={e=>setFormType(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                    <select 
+                      value={formType} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormType(val);
+                        if (val === 'markdown') setFormLangInput("Markdown (md)");
+                        else if (val === 'cli') setFormLangInput("Bash (shell, sh)");
+                        else if (['sandbox', 'link', 'gist'].includes(val)) setFormLangInput("");
+                      }} 
+                      className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none"
+                    >
                       <option value="code">Raw Code</option>
                       <option value="markdown">Markdown Document</option>
                       <option value="cli">Terminal / CLI</option>
