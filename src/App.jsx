@@ -260,9 +260,6 @@ export default function App() {
   const [collectionSortOrder, setCollectionSortOrder] = useState(() => {
     try { return localStorage.getItem('collectionSortOrder') || 'asc'; } catch { return 'asc'; }
   });
-  const [customCollectionOrder, setCustomCollectionOrder] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('customCollectionOrder')) || []; } catch { return []; }
-  });
 
   // Settings & Sync States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -287,6 +284,7 @@ export default function App() {
   const [deleteCollectionConfirm, setDeleteCollectionConfirm] = useState(null);
   const [bulkMovePromptOpen, setBulkMovePromptOpen] = useState(false);
   const [bulkMoveTarget, setBulkMoveTarget] = useState("");
+  const [bulkMoveNewCol, setBulkMoveNewCol] = useState("");
 
   const [formSection, setFormSection] = useState("");
   const [formTitle, setFormTitle] = useState("");
@@ -313,7 +311,6 @@ export default function App() {
   useEffect(() => { localStorage.setItem('theme', theme); }, [theme]);
   useEffect(() => { localStorage.setItem('bulkSelectDefaultAll', JSON.stringify(bulkSelectDefaultAll)); }, [bulkSelectDefaultAll]);
   useEffect(() => { localStorage.setItem('collectionSortOrder', collectionSortOrder); }, [collectionSortOrder]);
-  useEffect(() => { localStorage.setItem('customCollectionOrder', JSON.stringify(customCollectionOrder)); }, [customCollectionOrder]);
   
   // Apply DOM Theme
   useEffect(() => {
@@ -526,22 +523,22 @@ export default function App() {
       
       if (action === 'delete') {
         newDb[activeSection] = newDb[activeSection].filter(s => !selectedIds.has(s.id));
-        if (newDb[activeSection].length === 0) {
-          delete newDb[activeSection];
-          setActiveSection(Object.keys(newDb)[0] || "");
-        }
       } 
-      else if (action === 'move' && targetSection && targetSection !== activeSection) {
+      else if (action === 'move' && targetSection) {
+        let actualTarget = targetSection;
+        if (targetSection === '--NEW--') {
+          actualTarget = bulkMoveNewCol.trim();
+          if (!actualTarget) return prev;
+          if (!newDb[actualTarget]) newDb[actualTarget] = [];
+        } else if (targetSection === activeSection) {
+          return prev; // do nothing if moving to same section
+        }
+        
         const snippetsToMove = newDb[activeSection].filter(s => selectedIds.has(s.id));
         newDb[activeSection] = newDb[activeSection].filter(s => !selectedIds.has(s.id));
         
-        if (!newDb[targetSection]) newDb[targetSection] = [];
-        newDb[targetSection] = [...newDb[targetSection], ...snippetsToMove];
-        
-        if (newDb[activeSection].length === 0) {
-          delete newDb[activeSection];
-          setActiveSection(targetSection);
-        }
+        if (!newDb[actualTarget]) newDb[actualTarget] = [];
+        newDb[actualTarget] = [...newDb[actualTarget], ...snippetsToMove];
       } 
       else {
         const isSharedTarget = action === 'share';
@@ -563,14 +560,7 @@ export default function App() {
     const secs = Object.keys(db);
     if (collectionSortOrder === 'asc') return [...secs].sort((a, b) => a.localeCompare(b));
     if (collectionSortOrder === 'desc') return [...secs].sort((a, b) => b.localeCompare(a));
-    return [...secs].sort((a, b) => {
-      const idxA = customCollectionOrder.indexOf(a);
-      const idxB = customCollectionOrder.indexOf(b);
-      if (idxA === -1 && idxB === -1) return a.localeCompare(b);
-      if (idxA === -1) return 1;
-      if (idxB === -1) return -1;
-      return idxA - idxB;
-    });
+    return secs; // Native DB schema order acts as Custom Order
   })();
 
   // --- Strict Search Engine ---
@@ -663,14 +653,18 @@ export default function App() {
     else if (dragType === 'collection' && collectionSortOrder === 'custom') {
       const sourceCol = e.dataTransfer.getData('collectionName');
       if (sourceCol && sourceCol !== targetSection) {
-         let newOrder = [...customCollectionOrder];
-         Object.keys(db).forEach(s => { if (!newOrder.includes(s)) newOrder.push(s); }); // ensure completeness
-         
-         const srcIdx = newOrder.indexOf(sourceCol);
-         const tgtIdx = newOrder.indexOf(targetSection);
-         newOrder.splice(srcIdx, 1);
-         newOrder.splice(tgtIdx, 0, sourceCol);
-         setCustomCollectionOrder(newOrder);
+         setDb(prev => {
+            const keys = Object.keys(prev);
+            const srcIdx = keys.indexOf(sourceCol);
+            const tgtIdx = keys.indexOf(targetSection);
+            keys.splice(srcIdx, 1);
+            keys.splice(tgtIdx, 0, sourceCol);
+
+            // Reconstruct object in new order (JSON format inherently saves this physical order)
+            const orderedDb = {};
+            keys.forEach(k => { orderedDb[k] = prev[k] });
+            return orderedDb;
+         });
       }
     }
   };
@@ -739,7 +733,6 @@ export default function App() {
     if (name && !db[name]) {
       setDb(prev => ({ ...prev, [name]: [] }));
       setActiveSection(name);
-      if (collectionSortOrder === 'custom') setCustomCollectionOrder(prev => [...prev, name]);
     }
     setSectionPromptOpen(false);
     setNewSectionName("");
@@ -750,10 +743,6 @@ export default function App() {
       setDb(prev => {
         const newDb = { ...prev };
         newDb[activeSection] = newDb[activeSection].filter(s => s.id !== deleteConfirmId);
-        if (newDb[activeSection].length === 0) {
-          delete newDb[activeSection];
-          setActiveSection(Object.keys(newDb)[0] || "");
-        }
         return newDb;
       });
       setActiveSnippet(null);
@@ -768,20 +757,14 @@ export default function App() {
     const newName = newCollectionNameInput.trim();
     if (newName && newName !== oldName && !db[newName]) {
       setDb(prev => {
-        const newDb = { ...prev };
-        newDb[newName] = newDb[oldName];
-        delete newDb[oldName];
+        const keys = Object.keys(prev);
+        const newDb = {};
+        keys.forEach(k => {
+          if (k === oldName) newDb[newName] = prev[k];
+          else newDb[k] = prev[k];
+        });
         return newDb;
       });
-      
-      // Update custom order reference if exists
-      setCustomCollectionOrder(prev => {
-         const newOrder = [...prev];
-         const idx = newOrder.indexOf(oldName);
-         if (idx !== -1) newOrder[idx] = newName;
-         return newOrder;
-      });
-
       if (activeSection === oldName) setActiveSection(newName);
     }
     setEditingCollectionName(null);
@@ -794,7 +777,6 @@ export default function App() {
         delete newDb[deleteCollectionConfirm];
         return newDb;
       });
-      setCustomCollectionOrder(prev => prev.filter(c => c !== deleteCollectionConfirm));
       
       if (activeSection === deleteCollectionConfirm) {
         const remaining = Object.keys(db).filter(k => k !== deleteCollectionConfirm);
@@ -809,6 +791,14 @@ export default function App() {
   return (
     <div className={`flex h-screen w-full font-sans overflow-hidden bg-white text-gray-900 dark:bg-[#0d1117] dark:text-[#c9d1d9] selection:bg-blue-200 dark:selection:bg-[#1f6feb] selection:text-black dark:selection:text-white transition-colors duration-200`}>
       <style>{`
+        /* Global Smooth Theme Transitions */
+        body, div, span, nav, header, footer, button, ul, li {
+          transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+        iframe, video, img, input, textarea, select {
+          transition: none; /* Prevent input typing lag or media flickering */
+        }
+        
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -867,13 +857,20 @@ export default function App() {
                        e.dataTransfer.setData('dragType', 'collection');
                        e.dataTransfer.setData('collectionName', section);
                      }}
-                     onDragOver={(e) => { e.preventDefault(); setDragOverSection(section); }}
-                     onDragLeave={() => setDragOverSection(null)}
+                     onDragEnter={(e) => { e.preventDefault(); setDragOverSection(section); }}
+                     onDragOver={(e) => { e.preventDefault(); }}
+                     onDragLeave={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget)) {
+                           setDragOverSection(null);
+                        }
+                     }}
                      onDrop={(e) => handleDropItem(e, section)}
                 >
                   <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); setIsSelectionMode(false); setSelectedIds(new Set()); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${dragOverSection === section ? 'bg-blue-200 dark:bg-[#388bfd]/30' : (activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]')}`}>
-                    <Folder size={16} className={activeSection === section || dragOverSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
-                    <span className="truncate flex-1 text-left">{section}</span>
+                    <div className="pointer-events-none flex items-center gap-2 w-full">
+                      <Folder size={16} className={activeSection === section || dragOverSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
+                      <span className="truncate flex-1 text-left">{section}</span>
+                    </div>
                   </button>
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white dark:bg-[#161b22] px-1 rounded shadow-sm border border-gray-200 dark:border-transparent">
                     <button onClick={(e) => { e.stopPropagation(); setEditingCollectionName(section); setNewCollectionNameInput(section); }} className="p-1 text-gray-500 hover:text-blue-600 dark:text-[#8b949e] dark:hover:text-white"><Edit2 size={12} /></button>
@@ -907,7 +904,7 @@ export default function App() {
               <button onClick={() => { 
                 const newMode = !isSelectionMode;
                 setIsSelectionMode(newMode); 
-                setActiveSnippet(null); // Clear active snippet to prevent visual glitch
+                setActiveSnippet(null); 
                 if (newMode && bulkSelectDefaultAll) {
                   setSelectedIds(new Set(filteredSnippets.map(s => s.id)));
                 } else {
@@ -934,14 +931,25 @@ export default function App() {
         {/* Bulk Action Bar */}
         {isSelectionMode && selectedIds.size > 0 && (
           <div className="bg-blue-50 dark:bg-[#1f6feb]/10 border-b border-blue-100 dark:border-[#1f6feb]/20 p-2 flex items-center justify-between shadow-sm z-10">
-            <span className="text-xs font-semibold text-blue-700 dark:text-[#58a6ff] px-2">{selectedIds.size} Selected</span>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-2 px-2 border-r border-blue-200 dark:border-[#1f6feb]/30 mr-2 pr-4">
+              <input 
+                type="checkbox" 
+                className="rounded border-blue-300 cursor-pointer"
+                checked={selectedIds.size === filteredSnippets.length && filteredSnippets.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) setSelectedIds(new Set(filteredSnippets.map(s => s.id)));
+                  else setSelectedIds(new Set());
+                }}
+              />
+              <span className="text-xs font-semibold text-blue-700 dark:text-[#58a6ff]">{selectedIds.size} Selected</span>
+            </div>
+            
+            <div className="flex gap-1 ml-auto">
               <button onClick={() => {
                 const targets = displaySections.filter(s => s !== activeSection);
-                if(targets.length > 0) {
-                  setBulkMoveTarget(targets[0]);
-                  setBulkMovePromptOpen(true);
-                }
+                setBulkMoveTarget(targets[0] || "--NEW--");
+                setBulkMoveNewCol("");
+                setBulkMovePromptOpen(true);
               }} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Move to Collection"><FolderOpen size={12}/></button>
               <button onClick={() => handleBulkAction('share')} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Make Shareable"><Share2 size={12}/></button>
               <button onClick={() => handleBulkAction('private')} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Make Private"><Key size={12}/></button>
@@ -1294,13 +1302,23 @@ export default function App() {
             </div>
             <div className="p-6">
               <p className="mb-4 text-sm text-gray-700 dark:text-[#c9d1d9]">Select destination collection:</p>
-              <select value={bulkMoveTarget} onChange={e=>setBulkMoveTarget(e.target.value)} className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none mb-6">
+              <select value={bulkMoveTarget} onChange={e=>{ setBulkMoveTarget(e.target.value); setBulkMoveNewCol(""); }} className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none mb-4">
                 <option value="" disabled>Select collection...</option>
+                <option value="--NEW--">+ Create New Collection</option>
                 {displaySections.filter(s => s !== activeSection).map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <div className="flex justify-end gap-3">
+              
+              {bulkMoveTarget === '--NEW--' && (
+                 <input autoFocus type="text" placeholder="New Collection Name" value={bulkMoveNewCol} onChange={e=>setBulkMoveNewCol(e.target.value)} className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none mb-6" />
+              )}
+
+              <div className="flex justify-end gap-3 mt-6">
                 <button onClick={() => setBulkMovePromptOpen(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] rounded-md">Cancel</button>
-                <button onClick={() => { handleBulkAction('move', bulkMoveTarget); setBulkMovePromptOpen(false); }} disabled={!bulkMoveTarget} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] rounded-md">Move</button>
+                <button onClick={() => { 
+                   if (bulkMoveTarget === '--NEW--' && !bulkMoveNewCol.trim()) return;
+                   handleBulkAction('move', bulkMoveTarget); 
+                   setBulkMovePromptOpen(false); 
+                }} disabled={!bulkMoveTarget || (bulkMoveTarget === '--NEW--' && !bulkMoveNewCol.trim())} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] rounded-md">Move</button>
               </div>
             </div>
           </div>
