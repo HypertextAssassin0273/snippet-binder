@@ -150,31 +150,6 @@ const MarkdownViewer = ({ content }) => {
   );
 };
 
-const CliViewer = ({ content }) => {
-  return (
-    <div className="w-full h-full bg-[#0d1117] text-[#e6edf3] p-4 font-mono text-sm rounded-xl border border-gray-200 dark:border-[#30363d] overflow-auto shadow-sm mt-4">
-      <div className="flex gap-2 mb-4 border-b border-[#30363d] pb-3">
-        <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-        <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-        <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-      </div>
-      <pre className="whitespace-pre-wrap">
-        {content.split('\n').map((line, i) => {
-          const isPrompt = line.match(/^[$>]?\s*/);
-          const prompt = isPrompt ? isPrompt[0] : '';
-          const text = line.substring(prompt.length);
-          return (
-            <div key={i} className="flex leading-relaxed hover:bg-[#161b22] px-1 rounded transition-colors">
-              <span className="text-[#3fb950] mr-2 select-none font-bold w-4 text-right">{prompt || '> '}</span>
-              <span className="text-[#e6edf3] break-all">{text}</span>
-            </div>
-          );
-        })}
-      </pre>
-    </div>
-  );
-};
-
 export default function App() {
   const [db, setDb] = useState(null); 
   const [activeSection, setActiveSection] = useState("");
@@ -191,6 +166,7 @@ export default function App() {
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
   });
+  const [mdPreview, setMdPreview] = useState(true); // Toggles MD preview vs raw
 
   // GitHub Sync States
   const [ghToken, setGhToken] = useState(getStoredToken);
@@ -271,6 +247,9 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => { if (db !== null) setLocalDb(db); }, [db]);
+  
+  // Reset preview mode when changing snippets
+  useEffect(() => { setMdPreview(true); }, [activeSnippet?.id]);
 
   // Handle Drag Resizing
   useEffect(() => {
@@ -372,7 +351,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => { if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll(); }, [activeSnippet]);
+  useEffect(() => { if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll(); }, [activeSnippet, mdPreview]);
 
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
@@ -383,12 +362,12 @@ export default function App() {
     return s.title.toLowerCase().includes(q) || s.tags.some(t => t.toLowerCase().includes(q)) || (s.content && s.content.toLowerCase().includes(q));
   });
 
-  const getIconForType = (type, size = 16) => {
+  const getIconForType = (type, language, size = 16) => {
+    if (type === 'code' && language === 'markdown') return <FileText size={size} />;
+    if (type === 'code' && ['bash', 'shell'].includes(language)) return <Terminal size={size} />;
     switch (type) {
       case 'gist': return <Github size={size} />;
       case 'link': return <LinkIcon size={size} />;
-      case 'cli': return <Terminal size={size} />;
-      case 'markdown': return <FileText size={size} />;
       case 'sandbox': return <Box size={size} />;
       default: return <Code size={size} />;
     }
@@ -398,9 +377,9 @@ export default function App() {
     if (!activeSnippet) return;
     let textToCopy = activeSnippet.url || activeSnippet.content;
     
-    // Smart copy: Strip CLI prompts
-    if (activeSnippet.type === 'cli') {
-      textToCopy = textToCopy.replace(/^[$>]?\s*/gm, '');
+    // Smart copy: Strip CLI prompts if language is bash/shell
+    if (activeSnippet.type === 'code' && ['bash', 'shell'].includes(activeSnippet.language)) {
+      textToCopy = textToCopy.replace(/^[$>]\s+/gm, '');
     }
     
     navigator.clipboard.writeText(textToCopy);
@@ -417,7 +396,7 @@ export default function App() {
     setFormLangInput(foundLang ? foundLang.label : (activeSnippet.language || ""));
     
     setFormTags(activeSnippet.tags.join(', '));
-    setFormContent((['code', 'cli', 'markdown'].includes(activeSnippet.type)) ? activeSnippet.content : activeSnippet.url);
+    setFormContent(activeSnippet.type === 'code' ? activeSnippet.content : activeSnippet.url);
     setFormSection(activeSection);
     setFormIsShared(activeSnippet.isShared || false);
     setEditingSnippetId(activeSnippet.id);
@@ -634,7 +613,7 @@ export default function App() {
                 <li key={snippet.id}>
                   <button onClick={() => setActiveSnippet(snippet)} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
-                      {getIconForType(snippet.type)}
+                      {getIconForType(snippet.type, snippet.language)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
@@ -667,9 +646,17 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs font-mono text-gray-500 dark:text-[#8b949e] uppercase flex items-center gap-1">
-                    {getIconForType(activeSnippet.type, 12)}
+                    {getIconForType(activeSnippet.type, activeSnippet.language, 12)}
                     {(!['link', 'sandbox'].includes(activeSnippet.type)) && (activeSnippet.language || activeSnippet.type)}
                   </span>
+                  
+                  {activeSnippet.type === 'code' && activeSnippet.language === 'markdown' && (
+                    <div className="flex bg-gray-200 dark:bg-[#30363d] rounded-md p-0.5 ml-2">
+                      <button onClick={() => setMdPreview(true)} className={`px-2 py-1 text-[10px] uppercase font-bold rounded-sm transition-colors ${mdPreview ? 'bg-white dark:bg-[#161b22] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Preview</button>
+                      <button onClick={() => setMdPreview(false)} className={`px-2 py-1 text-[10px] uppercase font-bold rounded-sm transition-colors ${!mdPreview ? 'bg-white dark:bg-[#161b22] shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Raw</button>
+                    </div>
+                  )}
+
                   <div className="flex gap-1.5">{activeSnippet.tags.map(tag => <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white border-gray-300 dark:bg-[#21262d] dark:border-[#30363d] border text-gray-600 dark:text-[#c9d1d9]">{tag}</span>)}</div>
                 </div>
               </div>
@@ -682,13 +669,13 @@ export default function App() {
 
             <div className="flex-1 p-4 overflow-y-auto bg-white dark:bg-[#0d1117]">
               {activeSnippet.type === 'code' ? (
-                <div className="prism-code-override h-full">
-                  <pre className="h-full p-4 overflow-auto text-sm font-mono"><code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code></pre>
-                </div>
-              ) : activeSnippet.type === 'markdown' ? (
-                <MarkdownViewer content={activeSnippet.content} />
-              ) : activeSnippet.type === 'cli' ? (
-                <CliViewer content={activeSnippet.content} />
+                (activeSnippet.language === 'markdown' && mdPreview) ? (
+                  <MarkdownViewer content={activeSnippet.content} />
+                ) : (
+                  <div className="prism-code-override h-full">
+                    <pre className="h-full p-4 overflow-auto text-sm font-mono"><code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code></pre>
+                  </div>
+                )
               ) : activeSnippet.type === 'sandbox' ? (
                 <SandboxViewer url={activeSnippet.url} />
               ) : activeSnippet.type === 'link' ? (
@@ -789,28 +776,24 @@ export default function App() {
                       onChange={e => {
                         const val = e.target.value;
                         setFormType(val);
-                        if (val === 'markdown') setFormLangInput("Markdown (md)");
-                        else if (val === 'cli') setFormLangInput("Bash (shell, sh)");
-                        else if (['sandbox', 'link', 'gist'].includes(val)) setFormLangInput("");
+                        if (['sandbox', 'link', 'gist'].includes(val)) setFormLangInput("");
                       }} 
                       className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none"
                     >
                       <option value="code">Raw Code</option>
-                      <option value="markdown">Markdown Document</option>
-                      <option value="cli">Terminal / CLI</option>
                       <option value="sandbox">Code Sandbox (Embed)</option>
                       <option value="gist">GitHub Gist URL</option>
                       <option value="link">Web Link / Video URL</option>
                     </select>
                   </div>
-                  <div className={`w-1/3 ${['link', 'gist', 'sandbox', 'markdown', 'cli'].includes(formType) ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className={`w-1/3 ${['link', 'gist', 'sandbox'].includes(formType) ? 'opacity-50 pointer-events-none' : ''}`}>
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
                     <input 
                       type="text" 
                       list="prism-languages"
                       value={formLangInput} 
                       onChange={e=>setFormLangInput(e.target.value)} 
-                      disabled={['link', 'gist', 'sandbox', 'markdown', 'cli'].includes(formType)} 
+                      disabled={['link', 'gist', 'sandbox'].includes(formType)} 
                       className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none disabled:bg-gray-100 dark:disabled:bg-[#21262d]" 
                       placeholder="e.g. javascript" 
                     />
@@ -833,9 +816,9 @@ export default function App() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">
-                    {['code', 'markdown', 'cli'].includes(formType) ? 'Content' : 'URL'}
+                    {formType === 'code' ? 'Content' : 'URL'}
                   </label>
-                  {['code', 'markdown', 'cli'].includes(formType) ? (
+                  {formType === 'code' ? (
                     <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-64 focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> 
                   ) : (
                     <input required type="url" value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 font-mono text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" placeholder="https://" />
