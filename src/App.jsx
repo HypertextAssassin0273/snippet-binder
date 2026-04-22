@@ -1350,19 +1350,23 @@ export default function App() {
                       <h5 className="font-medium text-sm">Maximum Pins per Collection</h5>
                       <p className="text-xs text-gray-500 dark:text-[#8b949e]">Set how many snippets can stay pinned in each collection.</p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" checked={maxPins === 5} onChange={(e) => setMaxPins(e.target.checked ? 5 : 3)} className="sr-only peer" />
-                      <div className="relative w-28 h-9 rounded-full border border-gray-300 dark:border-[#30363d] bg-white dark:bg-[#010409] px-2">
-                        <div className="absolute inset-0 flex items-center justify-between px-3 text-[10px] font-semibold">
-                          <span className={`${maxPins === 3 ? 'text-blue-700 dark:text-[#58a6ff]' : 'text-gray-500 dark:text-[#8b949e]'}`}>3 Pins</span>
-                          <span className={`${maxPins === 5 ? 'text-blue-700 dark:text-[#58a6ff]' : 'text-gray-500 dark:text-[#8b949e]'}`}>5 Pins</span>
-                        </div>
-                        <span className="absolute top-1 left-1 h-7 w-12 rounded-full bg-blue-600 dark:bg-[#1f6feb] text-white shadow-sm transition-transform duration-200 ease-out peer-checked:translate-x-[3.75rem] flex items-center justify-center gap-1">
-                          <Pin size={10} className="fill-current" />
-                          <span className="text-[10px] font-semibold">{maxPins}</span>
-                        </span>
-                      </div>
-                    </label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={maxPins === 5}
+                      aria-label="Toggle maximum pins between 3 and 5"
+                      onClick={() => setMaxPins(maxPins === 5 ? 3 : 5)}
+                      className="relative w-28 h-9 rounded-full border border-gray-300 dark:border-[#30363d] bg-white dark:bg-[#010409] p-1"
+                    >
+                      <span className="absolute inset-0 grid grid-cols-2 items-center px-2 text-[10px] font-semibold">
+                        <span className={`text-center ${maxPins === 3 ? 'text-blue-700 dark:text-[#58a6ff]' : 'text-gray-500 dark:text-[#8b949e]'}`}>3 Pins</span>
+                        <span className={`text-center ${maxPins === 5 ? 'text-blue-700 dark:text-[#58a6ff]' : 'text-gray-500 dark:text-[#8b949e]'}`}>5 Pins</span>
+                      </span>
+                      <span className={`absolute top-1 h-7 w-[calc(50%-0.25rem)] rounded-full bg-blue-600 dark:bg-[#1f6feb] text-white shadow-sm transition-all duration-200 ease-out flex items-center justify-center gap-1 ${maxPins === 5 ? 'left-[calc(50%)]' : 'left-1'}`}>
+                        <Pin size={10} className="fill-current" />
+                        <span className="text-[10px] font-semibold">{maxPins}</span>
+                      </span>
+                    </button>
                   </div>
 
                 </div>
