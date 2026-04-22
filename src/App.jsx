@@ -174,7 +174,7 @@ export default function App() {
   const [activeSnippet, setActiveSnippet] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // External Languages State with fallback
+  // External Languages State with clean fallbacks
   const [prismLanguages, setPrismLanguages] = useState([
     { id: 'javascript', label: 'JavaScript (js)' },
     { id: 'python', label: 'Python (py)' },
