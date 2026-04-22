@@ -3,7 +3,7 @@ import {
   Search, Folder, FileCode, Plus, Save, Copy, 
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
-  Link as LinkIcon
+  Link as LinkIcon, Terminal, FileText, Box
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -75,21 +75,13 @@ const GistEmbed = ({ url, theme }) => {
         <base target="_blank">
         <style>
           body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: ${colors.bg}; }
-          
-          /* Aggressive overrides for GitHub's latest HTML structure */
-          .gist .gist-file, .gist .Box, .gist .color-bg-default { 
-            border-radius: 8px; border: 1px solid ${colors.border} !important; margin: 0 !important; background-color: ${colors.bg} !important; 
-          }
+          .gist .gist-file, .gist .Box, .gist .color-bg-default { border-radius: 8px; border: 1px solid ${colors.border} !important; margin: 0 !important; background-color: ${colors.bg} !important; }
           .gist .gist-data { background-color: ${colors.bg} !important; border-bottom: 1px solid ${colors.border} !important; }
           .gist .blob-wrapper table, .gist .blob-code, .gist .blob-code-inner { color: ${colors.text} !important; background-color: transparent !important; }
           .gist .blob-num { color: ${colors.metaText} !important; border-right: 1px solid ${colors.border} !important; background: transparent !important; }
-          
-          /* Syntax Highlighting overrides */
           .gist .pl-s { color: ${isDark ? '#a5d6ff' : '#0a3069'} !important; }
           .gist .pl-k { color: ${isDark ? '#ff7b72' : '#cf222e'} !important; }
           .gist .pl-en { color: ${isDark ? '#d2a8ff' : '#8250df'} !important; }
-          
-          /* Footer overrides */
           .gist .gist-meta { background-color: ${colors.metaBg} !important; color: ${colors.metaText} !important; font-size: 12px !important; border-radius: 0 0 8px 8px; padding: 10px !important; }
           .gist .gist-meta a { color: ${colors.link} !important; text-decoration: none; }
           .gist .gist-meta a:hover { text-decoration: underline; }
@@ -100,9 +92,7 @@ const GistEmbed = ({ url, theme }) => {
       </body>
     </html>
   `;
-  return (
-    <iframe srcDoc={iframeSrc} className="w-full h-full border-none rounded-lg min-h-[400px]" title="GitHub Gist" />
-  );
+  return <iframe srcDoc={iframeSrc} className="w-full h-full border-none rounded-lg min-h-[400px]" title="GitHub Gist" />;
 };
 
 const LinkViewer = ({ url }) => {
@@ -115,71 +105,85 @@ const LinkViewer = ({ url }) => {
     return (
       <div className="w-full max-w-4xl mx-auto h-full flex flex-col justify-center">
         <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-[#30363d] shadow-sm">
-          <iframe 
-            src={`https://www.youtube.com/embed/${videoId}`} 
-            className="absolute top-0 left-0 w-full h-full border-none"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowFullScreen 
-            title="YouTube Video"
-          />
+          <iframe src={`https://www.youtube.com/embed/${videoId}`} className="absolute top-0 left-0 w-full h-full border-none" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="YouTube Video" />
         </div>
       </div>
     );
   }
 
-  if (isPdf) {
-    return (
-      <iframe 
-        src={url} 
-        className="w-full h-full border border-gray-200 dark:border-[#30363d] rounded-xl" 
-        title="PDF Viewer" 
-      />
-    );
-  }
-
-  if (isImage) {
-    return (
-      <div className="w-full h-full flex items-center justify-center p-4">
-        <img 
-          src={url} 
-          alt="Embed" 
-          className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" 
-        />
-      </div>
-    );
-  }
+  if (isPdf) return <iframe src={url} className="w-full h-full border border-gray-200 dark:border-[#30363d] rounded-xl min-h-[500px]" title="PDF Viewer" />;
+  if (isImage) return <div className="w-full h-full flex items-center justify-center p-4"><img src={url} alt="Embed" className="max-w-full max-h-full object-contain rounded-xl shadow-sm border border-gray-200 dark:border-[#30363d]" /></div>;
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-4">
       <div className="p-8 bg-gray-50 dark:bg-[#161b22] border border-gray-200 dark:border-[#30363d] rounded-2xl max-w-lg w-full shadow-sm">
-        <div className="w-16 h-16 bg-blue-100 dark:bg-[#1f6feb]/20 text-blue-600 dark:text-[#58a6ff] rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <LinkIcon size={32} />
-        </div>
+        <div className="w-16 h-16 bg-blue-100 dark:bg-[#1f6feb]/20 text-blue-600 dark:text-[#58a6ff] rounded-2xl flex items-center justify-center mx-auto mb-4"><LinkIcon size={32} /></div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">External Reference</h3>
         <p className="text-sm text-gray-500 dark:text-[#8b949e] mb-6 line-clamp-2">{url}</p>
-        <a 
-          href={url} target="_blank" rel="noreferrer" 
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          Open Link <ExternalLink size={16} />
-        </a>
+        <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] text-white text-sm font-medium rounded-lg transition-colors">Open Link <ExternalLink size={16} /></a>
       </div>
     </div>
   );
 };
 
+const SandboxViewer = ({ url }) => {
+  let embedUrl = url;
+  // Intelligently transform raw URLs to their embed counterparts
+  if (url.includes('codepen.io') && url.includes('/pen/')) embedUrl = url.replace('/pen/', '/embed/');
+  else if (url.includes('codesandbox.io/s/')) embedUrl = url.replace('/s/', '/embed/');
+  else if (url.includes('stackblitz.com/edit/') && !url.includes('embed=1')) embedUrl = url + (url.includes('?') ? '&' : '?') + 'embed=1';
+  
+  return (
+    <div className="w-full h-full pt-4">
+      <iframe src={embedUrl} className="w-full h-full border border-gray-200 dark:border-[#30363d] rounded-xl bg-white dark:bg-[#010409] min-h-[500px]" allowFullScreen sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts" title="Sandbox Embed" />
+    </div>
+  );
+};
+
+const MarkdownViewer = ({ content }) => {
+  return (
+    <div className="w-full h-full overflow-auto p-6 bg-white dark:bg-[#0d1117]">
+      <div 
+        className="markdown-body max-w-4xl mx-auto"
+        dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(content) : '<p>Loading renderer...</p>' }}
+      />
+    </div>
+  );
+};
+
+const CliViewer = ({ content }) => {
+  return (
+    <div className="w-full h-full bg-[#0d1117] text-[#e6edf3] p-4 font-mono text-sm rounded-xl border border-gray-200 dark:border-[#30363d] overflow-auto shadow-sm mt-4">
+      <div className="flex gap-2 mb-4 border-b border-[#30363d] pb-3">
+        <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+        <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+        <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+      </div>
+      <pre className="whitespace-pre-wrap">
+        {content.split('\n').map((line, i) => {
+          const isPrompt = line.match(/^[\$>]?\s*/);
+          const prompt = isPrompt ? isPrompt[0] : '';
+          const text = line.substring(prompt.length);
+          return (
+            <div key={i} className="flex leading-relaxed hover:bg-[#161b22] px-1 rounded transition-colors">
+              <span className="text-[#3fb950] mr-2 select-none font-bold w-4 text-right">{prompt || '> '}</span>
+              <span className="text-[#e6edf3] break-all">{text}</span>
+            </div>
+          );
+        })}
+      </pre>
+    </div>
+  );
+};
+
 export default function App() {
-  const [db, setDb] = useState(null); // null indicates DB is loading from IndexedDB
+  const [db, setDb] = useState(null); 
   const [activeSection, setActiveSection] = useState("");
   const [activeSnippet, setActiveSnippet] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // External Languages State with clean fallbacks
-  const [prismLanguages, setPrismLanguages] = useState([
-    { id: 'javascript', label: 'JavaScript (js)' },
-    { id: 'python', label: 'Python (py)' },
-    { id: 'plain', label: 'Plain Text (txt)' }
-  ]);
+  // External Languages State
+  const [prismLanguages, setPrismLanguages] = useState([]);
   
   // Layout States
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -227,30 +231,56 @@ export default function App() {
     setIsAdding(false);
   };
 
-  // Fetch external language config
+  // Dynamic Component Loaders (Prism + Marked)
   useEffect(() => {
-    fetch('./languages.json')
-      .then(res => {
-        if (!res.ok) throw new Error('Network response failed');
-        return res.json();
-      })
-      .then(data => {
-        setPrismLanguages(data);
-      })
-      .catch(err => console.warn("Failed to load languages.json. Using fallbacks.", err));
-  }, []); // Run only once on mount
+    // 1. Prism
+    const prismCss = document.createElement('link');
+    prismCss.rel = 'stylesheet';
+    prismCss.href = theme === 'dark' ? 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css' : 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
+    document.head.appendChild(prismCss);
+    const prismJs = document.createElement('script');
+    prismJs.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js';
+    prismJs.async = true;
+    prismJs.onload = () => {
+      const autoloader = document.createElement('script');
+      autoloader.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js';
+      autoloader.onload = () => {
+        window.Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+        window.Prism?.highlightAll();
+      };
+      document.body.appendChild(autoloader);
+    };
+    document.body.appendChild(prismJs);
 
-  // Theme effect
+    // 2. Marked.js (for Markdown Viewer)
+    if (!window.marked) {
+      const markedJs = document.createElement('script');
+      markedJs.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+      document.body.appendChild(markedJs);
+    }
+
+    return () => { document.head.removeChild(prismCss); document.body.removeChild(prismJs); };
+  }, [theme]);
+
+  // Fetch languages
+  useEffect(() => {
+    fetch('./languages.json').then(res => res.json()).then(data => setPrismLanguages(data)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Persist to IndexedDB on change
+  useEffect(() => { if (db !== null) setLocalDb(db); }, [db]);
+
+  // Auto-fill language input based on specific types
   useEffect(() => {
-    if (db !== null) setLocalDb(db);
-  }, [db]);
+    if (formType === 'markdown') setFormLangInput("Markdown (md)");
+    else if (formType === 'cli') setFormLangInput("Bash (shell, sh)");
+    else if (formType === 'sandbox' || formType === 'link' || formType === 'gist') setFormLangInput("");
+  }, [formType]);
 
   // Handle Drag Resizing
   useEffect(() => {
@@ -269,7 +299,6 @@ export default function App() {
     };
   }, [isDragging, isSidebarOpen]);
 
-  // Calculate Shared Payload
   const payloadDb = useMemo(() => {
     if (!db) return {};
     if (!syncOnlyShared) return db;
@@ -281,11 +310,8 @@ export default function App() {
     return payload;
   }, [db, syncOnlyShared]);
 
-  const hasChanges = useMemo(() => {
-    return lastSyncedDb !== "" && JSON.stringify(payloadDb) !== lastSyncedDb;
-  }, [payloadDb, lastSyncedDb]);
+  const hasChanges = useMemo(() => lastSyncedDb !== "" && JSON.stringify(payloadDb) !== lastSyncedDb, [payloadDb, lastSyncedDb]);
 
-  // INITIALIZATION & MERGE LOGIC
   useEffect(() => {
     const initializeApp = async () => {
       let localData = await getLocalDb();
@@ -298,28 +324,18 @@ export default function App() {
       try {
         setSyncStatus("Fetching live data...");
         const res = await fetch(GITHUB_CONFIG.PATH);
-        
-        if (res.status === 404) {
-          setSyncStatus("No existing remote data found.");
-          setLastSyncedDb(JSON.stringify(payloadDb)); 
-          return;
-        }
+        if (res.status === 404) { setSyncStatus("No existing remote data found."); setLastSyncedDb(JSON.stringify(payloadDb)); return; }
         if (!res.ok) throw new Error("Failed to fetch deployed data.");
         
         const remoteData = await res.json();
-        
         const mergedDb = { ...localData };
         Object.keys(remoteData).forEach(section => {
           if (!mergedDb[section]) mergedDb[section] = [];
-          
           remoteData[section].forEach(remoteSnippet => {
             const incomingSnippet = { ...remoteSnippet, isShared: remoteSnippet.isShared !== false };
             const localIndex = mergedDb[section].findIndex(s => s.id === incomingSnippet.id);
-            if (localIndex >= 0) {
-              mergedDb[section][localIndex] = incomingSnippet;
-            } else {
-              mergedDb[section].push(incomingSnippet);
-            }
+            if (localIndex >= 0) mergedDb[section][localIndex] = incomingSnippet;
+            else mergedDb[section].push(incomingSnippet);
           });
         });
 
@@ -327,7 +343,6 @@ export default function App() {
         setLastSyncedDb(JSON.stringify(remoteData));
         setSyncStatus("");
       } catch (err) {
-        console.error("Fetch skipped (likely dev environment):", err.message);
         setSyncStatus("Local mode (Remote unreachable).");
         setLastSyncedDb(JSON.stringify(payloadDb)); 
       }
@@ -337,37 +352,20 @@ export default function App() {
   }, []);
 
   const saveToGitHub = async () => {
-    if (!ghToken || !GITHUB_CONFIG.OWNER) {
-      return alert("Please check configuration and Token.");
-    }
-    
+    if (!ghToken || !GITHUB_CONFIG.OWNER) return alert("Please check configuration and Token.");
     setIsSyncing(true);
     setSyncStatus("Syncing...");
-    
     try {
       let currentSha = null;
-      const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}/contents/${GITHUB_CONFIG.PATH}?ref=${GITHUB_CONFIG.BRANCH}`, {
-        headers: { Authorization: `Bearer ${ghToken}` }
-      });
-      if (shaRes.ok) {
-        const shaData = await shaRes.json();
-        currentSha = shaData.sha;
-      }
+      const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}/contents/${GITHUB_CONFIG.PATH}?ref=${GITHUB_CONFIG.BRANCH}`, { headers: { Authorization: `Bearer ${ghToken}` } });
+      if (shaRes.ok) { const shaData = await shaRes.json(); currentSha = shaData.sha; }
 
       const payloadString = JSON.stringify(payloadDb, null, 2);
       const content = utf8ToBase64(payloadString);
       const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.OWNER}/${GITHUB_CONFIG.REPO}/contents/${GITHUB_CONFIG.PATH}`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${ghToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: syncOnlyShared ? 'Update shared snippets via DevBinder' : 'Update all snippets via DevBinder',
-          content,
-          branch: GITHUB_CONFIG.BRANCH,
-          ...(currentSha && { sha: currentSha }) 
-        })
+        headers: { Authorization: `Bearer ${ghToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: syncOnlyShared ? 'Update shared snippets via DevBinder' : 'Update all snippets via DevBinder', content, branch: GITHUB_CONFIG.BRANCH, ...(currentSha && { sha: currentSha }) })
       });
 
       if (res.status === 409) throw new Error("Conflict: File modified elsewhere. Refresh needed.");
@@ -377,43 +375,13 @@ export default function App() {
       setSyncStatus(`Successfully pushed to ${GITHUB_CONFIG.BRANCH}!`);
       setTimeout(() => setSyncStatus(""), 4000);
     } catch (err) {
-      console.error(err);
       setSyncStatus(`Error: ${err.message}`);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  // PrismJS Init with Autoloader for 290+ languages
-  useEffect(() => {
-    const prismCss = document.createElement('link');
-    prismCss.rel = 'stylesheet';
-    prismCss.href = theme === 'dark' 
-      ? 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css'
-      : 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css';
-    document.head.appendChild(prismCss);
-    
-    const prismJs = document.createElement('script');
-    prismJs.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js';
-    prismJs.async = true;
-    
-    prismJs.onload = () => {
-      const autoloader = document.createElement('script');
-      autoloader.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js';
-      autoloader.onload = () => {
-        window.Prism.plugins.autoloader.languages_path = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
-        window.Prism?.highlightAll();
-      };
-      document.body.appendChild(autoloader);
-    };
-    
-    document.body.appendChild(prismJs);
-    return () => { document.head.removeChild(prismCss); document.body.removeChild(prismJs); };
-  }, [theme]);
-
-  useEffect(() => {
-    if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll();
-  }, [activeSnippet]);
+  useEffect(() => { if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll(); }, [activeSnippet]);
 
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
@@ -424,8 +392,27 @@ export default function App() {
     return s.title.toLowerCase().includes(q) || s.tags.some(t => t.toLowerCase().includes(q)) || (s.content && s.content.toLowerCase().includes(q));
   });
 
-  const handleCopy = (text) => {
-    navigator.clipboard.writeText(text);
+  const getIconForType = (type, size = 16) => {
+    switch (type) {
+      case 'gist': return <Github size={size} />;
+      case 'link': return <LinkIcon size={size} />;
+      case 'cli': return <Terminal size={size} />;
+      case 'markdown': return <FileText size={size} />;
+      case 'sandbox': return <Box size={size} />;
+      default: return <Code size={size} />;
+    }
+  };
+
+  const handleCopy = () => {
+    if (!activeSnippet) return;
+    let textToCopy = activeSnippet.url || activeSnippet.content;
+    
+    // Smart copy: Strip CLI prompts
+    if (activeSnippet.type === 'cli') {
+      textToCopy = textToCopy.replace(/^[\$>]?\s*/gm, '');
+    }
+    
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -439,7 +426,7 @@ export default function App() {
     setFormLangInput(foundLang ? foundLang.label : (activeSnippet.language || ""));
     
     setFormTags(activeSnippet.tags.join(', '));
-    setFormContent(activeSnippet.type === 'code' ? activeSnippet.content : activeSnippet.url);
+    setFormContent((['code', 'cli', 'markdown'].includes(activeSnippet.type)) ? activeSnippet.content : activeSnippet.url);
     setFormSection(activeSection);
     setFormIsShared(activeSnippet.isShared || false);
     setEditingSnippetId(activeSnippet.id);
@@ -450,6 +437,7 @@ export default function App() {
     e.preventDefault();
     
     const finalLangId = prismLanguages.find(l => l.label === formLangInput)?.id || formLangInput.trim().toLowerCase();
+    const isUrlType = ['link', 'gist', 'sandbox'].includes(formType);
 
     const snippetData = {
       id: editingSnippetId || Date.now().toString(),
@@ -458,7 +446,7 @@ export default function App() {
       language: finalLangId,
       tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
       isShared: formIsShared,
-      ...(formType === 'code' ? { content: formContent } : { url: formContent })
+      ...(isUrlType ? { url: formContent } : { content: formContent })
     };
 
     setDb(prev => {
@@ -553,6 +541,26 @@ export default function App() {
         .dark ::-webkit-scrollbar-thumb:hover { background: #484f58; }
         .prism-code-override pre { margin: 0 !important; border-radius: 0.5rem !important; background: #f8fafc !important; border: 1px solid #e2e8f0; height: 100%; color: #334155; }
         .dark .prism-code-override pre { background: #010409 !important; border: 1px solid #30363d; color: #c9d1d9; }
+        
+        /* Markdown Viewer Styles */
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; color: inherit; }
+        .markdown-body h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid #e5e7eb; }
+        .dark .markdown-body h1 { border-bottom-color: #30363d; }
+        .markdown-body h2 { font-size: 1.5em; }
+        .markdown-body h3 { font-size: 1.25em; }
+        .markdown-body p { margin-bottom: 1em; line-height: 1.6; }
+        .markdown-body a { color: #2563eb; text-decoration: none; }
+        .dark .markdown-body a { color: #58a6ff; }
+        .markdown-body a:hover { text-decoration: underline; }
+        .markdown-body ul, .markdown-body ol { padding-left: 2em; margin-bottom: 1em; }
+        .markdown-body ul { list-style-type: disc; }
+        .markdown-body ol { list-style-type: decimal; }
+        .markdown-body code { background-color: rgba(175, 184, 193, 0.2); padding: 0.2em 0.4em; border-radius: 6px; font-family: monospace; font-size: 85%; }
+        .markdown-body pre { background-color: #f6f8fa; padding: 16px; border-radius: 6px; overflow: auto; margin-bottom: 1em; border: 1px solid #e5e7eb; }
+        .dark .markdown-body pre { background-color: #161b22; border-color: #30363d; }
+        .markdown-body pre code { background-color: transparent; padding: 0; }
+        .markdown-body blockquote { border-left: 4px solid #d0d7de; padding-left: 1em; color: #656d76; margin-bottom: 1em; }
+        .dark .markdown-body blockquote { border-left-color: #30363d; color: #8b949e; }
       `}</style>
 
       {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize" />}
@@ -635,8 +643,7 @@ export default function App() {
                 <li key={snippet.id}>
                   <button onClick={() => setActiveSnippet(snippet)} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
-                      {snippet.type === 'gist' ? <Github size={16} /> : 
-                       snippet.type === 'link' ? <LinkIcon size={16} /> : <Code size={16} />}
+                      {getIconForType(snippet.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
@@ -661,7 +668,7 @@ export default function App() {
       <div className="flex-1 bg-white dark:bg-[#0d1117] flex flex-col overflow-hidden relative">
         {activeSnippet ? (
           <>
-            <div className="p-4 border-b border-gray-200 dark:border-[#30363d] flex items-center justify-between bg-gray-50 dark:bg-[#161b22]">
+            <div className="p-4 border-b border-gray-200 dark:border-[#30363d] flex items-center justify-between bg-gray-50 dark:bg-[#161b22] flex-shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-semibold">{activeSnippet.title}</h1>
@@ -669,15 +676,15 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs font-mono text-gray-500 dark:text-[#8b949e] uppercase flex items-center gap-1">
-                    {activeSnippet.type === 'gist' ? <Github size={12}/> : activeSnippet.type === 'link' ? <LinkIcon size={12}/> : <Code size={12}/>}
-                    {activeSnippet.type !== 'link' && activeSnippet.language}
+                    {getIconForType(activeSnippet.type, 12)}
+                    {(!['link', 'sandbox'].includes(activeSnippet.type)) && (activeSnippet.language || activeSnippet.type)}
                   </span>
                   <div className="flex gap-1.5">{activeSnippet.tags.map(tag => <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white border-gray-300 dark:bg-[#21262d] dark:border-[#30363d] border text-gray-600 dark:text-[#c9d1d9]">{tag}</span>)}</div>
                 </div>
               </div>
               <div className="flex gap-2">
                 <button onClick={openEditSnippetModal} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md"><Edit2 size={18} /></button>
-                <button onClick={() => handleCopy(activeSnippet.type === 'code' ? activeSnippet.content : activeSnippet.url)} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md">{copied ? <CheckCircle size={18} className="text-green-600 dark:text-[#3fb950]" /> : <Copy size={18} />}</button>
+                <button onClick={handleCopy} className="p-2 text-gray-500 hover:bg-gray-200 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md">{copied ? <CheckCircle size={18} className="text-green-600 dark:text-[#3fb950]" /> : <Copy size={18} />}</button>
                 <button onClick={() => setDeleteConfirmId(activeSnippet.id)} className="p-2 text-red-500 hover:bg-red-50 dark:text-[#f85149] dark:hover:bg-[#f85149]/10 rounded-md"><Trash2 size={18} /></button>
               </div>
             </div>
@@ -687,6 +694,12 @@ export default function App() {
                 <div className="prism-code-override h-full">
                   <pre className="h-full p-4 overflow-auto text-sm font-mono"><code className={`language-${activeSnippet.language}`}>{activeSnippet.content}</code></pre>
                 </div>
+              ) : activeSnippet.type === 'markdown' ? (
+                <MarkdownViewer content={activeSnippet.content} />
+              ) : activeSnippet.type === 'cli' ? (
+                <CliViewer content={activeSnippet.content} />
+              ) : activeSnippet.type === 'sandbox' ? (
+                <SandboxViewer url={activeSnippet.url} />
               ) : activeSnippet.type === 'link' ? (
                 <div className="h-full w-full py-4"><LinkViewer url={activeSnippet.url} /></div>
               ) : (
@@ -782,19 +795,22 @@ export default function App() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Source Type</label>
                     <select value={formType} onChange={e=>setFormType(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
                       <option value="code">Raw Code</option>
+                      <option value="markdown">Markdown Document</option>
+                      <option value="cli">Terminal / CLI</option>
+                      <option value="sandbox">Code Sandbox (Embed)</option>
                       <option value="gist">GitHub Gist URL</option>
                       <option value="link">Web Link / Video URL</option>
                     </select>
                   </div>
-                  <div className={`w-1/3 ${formType === 'link' || formType === 'gist' ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className={`w-1/3 ${['link', 'gist', 'sandbox', 'markdown', 'cli'].includes(formType) ? 'opacity-50 pointer-events-none' : ''}`}>
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
                     <input 
                       type="text" 
                       list="prism-languages"
                       value={formLangInput} 
                       onChange={e=>setFormLangInput(e.target.value)} 
-                      disabled={formType === 'link' || formType === 'gist'} 
-                      className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" 
+                      disabled={['link', 'gist', 'sandbox', 'markdown', 'cli'].includes(formType)} 
+                      className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none disabled:bg-gray-100 dark:disabled:bg-[#21262d]" 
                       placeholder="e.g. javascript" 
                     />
                     <datalist id="prism-languages">
@@ -815,8 +831,10 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">{formType === 'code' ? 'Code Content' : formType === 'gist' ? 'Gist URL' : 'Link URL'}</label>
-                  {formType === 'code' ? (
+                  <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">
+                    {['code', 'markdown', 'cli'].includes(formType) ? 'Content' : 'URL'}
+                  </label>
+                  {['code', 'markdown', 'cli'].includes(formType) ? (
                     <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-64 focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> 
                   ) : (
                     <input required type="url" value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 font-mono text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" placeholder="https://" />
