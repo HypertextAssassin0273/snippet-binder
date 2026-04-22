@@ -4,7 +4,7 @@ import {
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
   Link as LinkIcon, Terminal, FileText, Box, Image as ImageIcon, Film,
-  Settings, Download, Upload, CheckSquare, Square
+  Settings, Download, Upload, CheckSquare, Square, SlidersHorizontal
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -247,10 +247,21 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [middlePaneWidth, setMiddlePaneWidth] = useState(320); 
   const [isDragging, setIsDragging] = useState(false);
+  const [mdPreview, setMdPreview] = useState(true); 
+
+  // --- PREFERENCES ---
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
   });
-  const [mdPreview, setMdPreview] = useState(true); 
+  const [bulkSelectDefaultAll, setBulkSelectDefaultAll] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bulkSelectDefaultAll')) || false; } catch { return false; }
+  });
+  const [collectionSortOrder, setCollectionSortOrder] = useState(() => {
+    try { return localStorage.getItem('collectionSortOrder') || 'asc'; } catch { return 'asc'; }
+  });
+  const [customCollectionOrder, setCustomCollectionOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('customCollectionOrder')) || []; } catch { return []; }
+  });
 
   // Settings & Sync States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -275,8 +286,8 @@ export default function App() {
 
   const [formSection, setFormSection] = useState("");
   const [formTitle, setFormTitle] = useState("");
-  const [formCategory, setFormCategory] = useState("code"); // 'code' | 'url'
-  const [formUrlType, setFormUrlType] = useState("link"); // 'link' | 'gist' | 'sandbox' | 'image' | 'video'
+  const [formCategory, setFormCategory] = useState("code"); 
+  const [formUrlType, setFormUrlType] = useState("link"); 
   const [formLangInput, setFormLangInput] = useState(""); 
   const [formTags, setFormTags] = useState("");
   const [formContent, setFormContent] = useState("");
@@ -293,6 +304,18 @@ export default function App() {
     setEditingSnippetId(null);
     setIsAdding(false);
   };
+
+  // Preference Persistence Effects
+  useEffect(() => { localStorage.setItem('theme', theme); }, [theme]);
+  useEffect(() => { localStorage.setItem('bulkSelectDefaultAll', JSON.stringify(bulkSelectDefaultAll)); }, [bulkSelectDefaultAll]);
+  useEffect(() => { localStorage.setItem('collectionSortOrder', collectionSortOrder); }, [collectionSortOrder]);
+  useEffect(() => { localStorage.setItem('customCollectionOrder', JSON.stringify(customCollectionOrder)); }, [customCollectionOrder]);
+  
+  // Apply DOM Theme
+  useEffect(() => {
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [theme]);
 
   // Dynamic Component Loaders
   useEffect(() => {
@@ -336,12 +359,6 @@ export default function App() {
       ]);
     });
   }, []);
-
-  useEffect(() => {
-    if (theme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-    localStorage.setItem('theme', theme);
-  }, [theme]);
 
   useEffect(() => { if (db !== null) setLocalDb(db); }, [db]);
   
@@ -499,7 +516,6 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Bulk Operations
   const handleBulkAction = (action) => {
     setDb(prev => {
       const newDb = { ...prev };
@@ -523,28 +539,57 @@ export default function App() {
 
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
-  const sections = Object.keys(db);
-  
-  // Advanced Search Filtering
-  const queryTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
-  const filteredSnippets = (db[activeSection] || []).filter(s => {
-    if (queryTokens.length === 0) return true;
-    
-    // Strict exact tag match or whole-word content match
-    return queryTokens.every(token => {
-      // 1. Tag exact match or starts-with
-      if (s.tags.some(t => t.toLowerCase().startsWith(token))) return true;
-      // 2. Title/Content Word Boundary Match
-      const searchContent = `${s.title} ${s.content || ''} ${s.url || ''}`.toLowerCase();
-      // Regex \b checks for word boundaries, so 'dd' won't match inside 'address'
-      try {
-        const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
-        return regex.test(searchContent);
-      } catch {
-        return searchContent.includes(token); // Fallback
-      }
+  // --- Sorting Collections ---
+  const displaySections = (() => {
+    const secs = Object.keys(db);
+    if (collectionSortOrder === 'asc') return [...secs].sort((a, b) => a.localeCompare(b));
+    if (collectionSortOrder === 'desc') return [...secs].sort((a, b) => b.localeCompare(a));
+    return [...secs].sort((a, b) => {
+      const idxA = customCollectionOrder.indexOf(a);
+      const idxB = customCollectionOrder.indexOf(b);
+      if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
     });
-  });
+  })();
+
+  // --- Professional Search Engine (Relevance Scoring) ---
+  const queryTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+  const filteredSnippets = (db[activeSection] || [])
+    .map(s => {
+      if (queryTokens.length === 0) return { ...s, _score: 1 };
+      
+      let score = 0;
+      const titleLower = s.title.toLowerCase();
+      const contentLower = `${s.content || ''} ${s.url || ''}`.toLowerCase();
+      
+      const matchesAll = queryTokens.every(token => {
+        let matched = false;
+        
+        // Exact Tag Prefix Match (Highest Weight)
+        if (s.tags.some(t => t.toLowerCase() === token)) { score += 50; matched = true; }
+        else if (s.tags.some(t => t.toLowerCase().startsWith(token))) { score += 20; matched = true; }
+        
+        // Strict Title Boundary Match
+        if (!matched && titleLower.includes(token)) {
+          try {
+            if (new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(titleLower)) { score += 15; }
+            else { score += 10; }
+          } catch { score += 10; } // Fallback
+          matched = true;
+        }
+        
+        // Content Match
+        if (!matched && contentLower.includes(token)) { score += 1; matched = true; }
+        
+        return matched;
+      });
+      
+      return matchesAll ? { ...s, _score: score } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b._score - a._score); // Sort by highest relevance
 
   const getIconForType = (type, language, size = 16) => {
     if (type === 'code' && language === 'markdown') return <FileText size={size} />;
@@ -572,24 +617,40 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDropSnippet = (e, targetSection) => {
+  const handleDropItem = (e, targetSection) => {
     e.preventDefault();
     setDragOverSection(null);
-    const snippetId = e.dataTransfer.getData('snippetId');
-    const sourceSection = e.dataTransfer.getData('sourceSection');
-    
-    if (!snippetId || !sourceSection || sourceSection === targetSection) return;
-    
-    setDb(prev => {
-      const newDb = { ...prev };
-      const snippetIndex = newDb[sourceSection].findIndex(s => s.id === snippetId);
-      if (snippetIndex === -1) return prev;
+    const dragType = e.dataTransfer.getData('dragType');
+
+    if (dragType === 'snippet') {
+      const snippetId = e.dataTransfer.getData('snippetId');
+      const sourceSection = e.dataTransfer.getData('sourceSection');
+      if (!snippetId || !sourceSection || sourceSection === targetSection) return;
       
-      const [snippetToMove] = newDb[sourceSection].splice(snippetIndex, 1);
-      newDb[targetSection].push(snippetToMove);
-      return newDb;
-    });
-    setActiveSection(targetSection);
+      setDb(prev => {
+        const newDb = { ...prev };
+        const snippetIndex = newDb[sourceSection].findIndex(s => s.id === snippetId);
+        if (snippetIndex === -1) return prev;
+        
+        const [snippetToMove] = newDb[sourceSection].splice(snippetIndex, 1);
+        newDb[targetSection].push(snippetToMove);
+        return newDb;
+      });
+      setActiveSection(targetSection);
+    } 
+    else if (dragType === 'collection' && collectionSortOrder === 'custom') {
+      const sourceCol = e.dataTransfer.getData('collectionName');
+      if (sourceCol && sourceCol !== targetSection) {
+         let newOrder = [...customCollectionOrder];
+         Object.keys(db).forEach(s => { if (!newOrder.includes(s)) newOrder.push(s); }); // ensure completeness
+         
+         const srcIdx = newOrder.indexOf(sourceCol);
+         const tgtIdx = newOrder.indexOf(targetSection);
+         newOrder.splice(srcIdx, 1);
+         newOrder.splice(tgtIdx, 0, sourceCol);
+         setCustomCollectionOrder(newOrder);
+      }
+    }
   };
 
   const openEditSnippetModal = () => {
@@ -656,6 +717,7 @@ export default function App() {
     if (name && !db[name]) {
       setDb(prev => ({ ...prev, [name]: [] }));
       setActiveSection(name);
+      if (collectionSortOrder === 'custom') setCustomCollectionOrder(prev => [...prev, name]);
     }
     setSectionPromptOpen(false);
     setNewSectionName("");
@@ -689,6 +751,15 @@ export default function App() {
         delete newDb[oldName];
         return newDb;
       });
+      
+      // Update custom order reference if exists
+      setCustomCollectionOrder(prev => {
+         const newOrder = [...prev];
+         const idx = newOrder.indexOf(oldName);
+         if (idx !== -1) newOrder[idx] = newName;
+         return newOrder;
+      });
+
       if (activeSection === oldName) setActiveSection(newName);
     }
     setEditingCollectionName(null);
@@ -701,6 +772,8 @@ export default function App() {
         delete newDb[deleteCollectionConfirm];
         return newDb;
       });
+      setCustomCollectionOrder(prev => prev.filter(c => c !== deleteCollectionConfirm));
+      
       if (activeSection === deleteCollectionConfirm) {
         const remaining = Object.keys(db).filter(k => k !== deleteCollectionConfirm);
         setActiveSection(remaining[0] || "");
@@ -760,13 +833,21 @@ export default function App() {
           </div>
           
           <div className="flex-1 overflow-y-auto py-3 min-w-[255px]">
-            <div className="px-4 text-xs font-semibold text-gray-500 dark:text-[#8b949e] uppercase tracking-wider mb-2">Collections</div>
+            <div className="px-4 text-xs font-semibold text-gray-500 dark:text-[#8b949e] uppercase tracking-wider mb-2 flex items-center justify-between">
+              Collections
+              {collectionSortOrder === 'custom' && <SlidersHorizontal size={12} title="Custom Ordering Active" />}
+            </div>
             <nav className="space-y-0.5 px-2">
-              {sections.map(section => (
+              {displaySections.map(section => (
                 <div key={section} className="relative group"
+                     draggable={collectionSortOrder === 'custom'}
+                     onDragStart={(e) => {
+                       e.dataTransfer.setData('dragType', 'collection');
+                       e.dataTransfer.setData('collectionName', section);
+                     }}
                      onDragOver={(e) => { e.preventDefault(); setDragOverSection(section); }}
                      onDragLeave={() => setDragOverSection(null)}
-                     onDrop={(e) => handleDropSnippet(e, section)}
+                     onDrop={(e) => handleDropItem(e, section)}
                 >
                   <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); setIsSelectionMode(false); setSelectedIds(new Set()); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${dragOverSection === section ? 'bg-blue-200 dark:bg-[#388bfd]/30' : (activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]')}`}>
                     <Folder size={16} className={activeSection === section || dragOverSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
@@ -801,12 +882,20 @@ export default function App() {
               <h2 className="font-semibold truncate pr-2">{activeSection || "Snippets"}</h2>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }} className={`p-1.5 rounded-md transition-colors ${isSelectionMode ? 'bg-blue-100 text-blue-600 dark:bg-[#1f6feb]/20 dark:text-[#58a6ff]' : 'text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d]'}`} title="Select Multiple">
+              <button onClick={() => { 
+                const newMode = !isSelectionMode;
+                setIsSelectionMode(newMode); 
+                if (newMode && bulkSelectDefaultAll) {
+                  setSelectedIds(new Set(filteredSnippets.map(s => s.id)));
+                } else {
+                  setSelectedIds(new Set()); 
+                }
+              }} className={`p-1.5 rounded-md transition-colors ${isSelectionMode ? 'bg-blue-100 text-blue-600 dark:bg-[#1f6feb]/20 dark:text-[#58a6ff]' : 'text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d]'}`} title="Select Multiple">
                 <CheckSquare size={16} />
               </button>
               <button onClick={() => { 
                 resetFormFields();
-                setFormSection(activeSection || sections[0] || ""); 
+                setFormSection(activeSection || displaySections[0] || ""); 
                 setIsAdding(true); 
               }} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Add Snippet">
                 <Plus size={16} />
@@ -841,6 +930,7 @@ export default function App() {
                     draggable={!isSelectionMode}
                     onDragStart={(e) => {
                       if (isSelectionMode) return;
+                      e.dataTransfer.setData('dragType', 'snippet');
                       e.dataTransfer.setData('snippetId', snippet.id);
                       e.dataTransfer.setData('sourceSection', activeSection);
                     }}
@@ -1021,16 +1111,41 @@ export default function App() {
 
               {/* Preferences */}
               <div className="space-y-4">
-                <h4 className="font-semibold border-b border-gray-200 dark:border-[#30363d] pb-2 text-gray-800 dark:text-white flex items-center gap-2"><Sun size={16} className="text-yellow-500" /> Preferences</h4>
-                <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
-                  <div>
-                    <h5 className="font-medium text-sm">Application Theme</h5>
-                    <p className="text-xs text-gray-500 dark:text-[#8b949e]">Toggle between light and dark modes.</p>
+                <h4 className="font-semibold border-b border-gray-200 dark:border-[#30363d] pb-2 text-gray-800 dark:text-white flex items-center gap-2"><SlidersHorizontal size={16} className="text-purple-500" /> Preferences</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
+                    <div>
+                      <h5 className="font-medium text-sm">Application Theme</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">Toggle between light and dark modes.</p>
+                    </div>
+                    <select value={theme} onChange={(e) => setTheme(e.target.value)} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                      <option value="light">Light Mode</option>
+                      <option value="dark">Dark Mode</option>
+                    </select>
                   </div>
-                  <select value={theme} onChange={(e) => setTheme(e.target.value)} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
-                    <option value="light">Light Mode</option>
-                    <option value="dark">Dark Mode</option>
-                  </select>
+                  
+                  <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
+                    <div>
+                      <h5 className="font-medium text-sm">Bulk Selection Default</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">When entering select mode, default to all snippets checked.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" checked={bulkSelectDefaultAll} onChange={(e) => setBulkSelectDefaultAll(e.target.checked)} className="sr-only peer" />
+                      <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
+                    <div>
+                      <h5 className="font-medium text-sm">Collection Sort Order</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">If 'Custom', drag and drop collections in the sidebar to reorder.</p>
+                    </div>
+                    <select value={collectionSortOrder} onChange={(e) => setCollectionSortOrder(e.target.value)} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                      <option value="asc">Ascending (A-Z)</option>
+                      <option value="desc">Descending (Z-A)</option>
+                      <option value="custom">Custom (Drag & Drop)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1056,7 +1171,7 @@ export default function App() {
                   </div>
                   <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Collection</label>
-                    <select value={formSection} onChange={e=>setFormSection(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">{sections.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={formSection} onChange={e=>setFormSection(e.target.value)} className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">{displaySections.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                 </div>
                 <div className="flex gap-4">
