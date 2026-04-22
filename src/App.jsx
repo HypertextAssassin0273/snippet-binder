@@ -436,8 +436,9 @@ export default function App() {
       }
       
       setDb(localData);
-      setActiveSection(Object.keys(localData)[0] || "");
-      setFormSection(Object.keys(localData)[0] || "");
+      const orderedKeys = getOrderedSections(Object.keys(localData), collectionSortOrder);
+      setActiveSection(orderedKeys[0] || "");
+      setFormSection(orderedKeys[0] || "");
 
       try {
         setSyncStatus("Fetching live data...");
@@ -739,8 +740,6 @@ export default function App() {
             keys.forEach(k => { orderedDb[k] = prev[k] });
             return orderedDb;
          });
-         // Keep the moved collection highlighted after reorder.
-         setActiveSection(sourceCol);
       }
     }
   };
@@ -875,7 +874,7 @@ export default function App() {
       });
       
       if (activeSection === deleteCollectionConfirm) {
-        const remaining = Object.keys(db).filter(k => k !== deleteCollectionConfirm);
+        const remaining = getOrderedSections(Object.keys(db).filter(k => k !== deleteCollectionConfirm), collectionSortOrder);
         setActiveSection(remaining[0] || "");
         setActiveSnippet(null);
         setMdPreview(true);
@@ -1330,12 +1329,7 @@ export default function App() {
                       <p className="text-xs text-gray-500 dark:text-[#8b949e]">Choose how collections are ordered throughout the app.</p>
                     </div>
                     <select value={collectionSortOrder} onChange={(e) => {
-                      const nextOrder = e.target.value;
-                      setCollectionSortOrder(nextOrder);
-                      if (!db) return;
-
-                      const orderedSections = getOrderedSections(Object.keys(db), nextOrder);
-                      setActiveSection(orderedSections[0] || "");
+                      setCollectionSortOrder(e.target.value);
                     }} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
                       <option value="asc">Ascending (A-Z)</option>
                       <option value="desc">Descending (Z-A)</option>
