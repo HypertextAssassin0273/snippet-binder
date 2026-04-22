@@ -1325,7 +1325,7 @@ export default function App() {
                   <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
                     <div>
                       <h5 className="font-medium text-sm">Collection Sort Order</h5>
-                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">If 'Custom', drag and drop collections in the sidebar to reorder.</p>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">Choose how collections are ordered throughout the app.</p>
                     </div>
                     <select value={collectionSortOrder} onChange={(e) => setCollectionSortOrder(e.target.value)} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
                       <option value="asc">Ascending (A-Z)</option>
