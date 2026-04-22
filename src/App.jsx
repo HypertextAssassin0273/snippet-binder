@@ -1324,17 +1324,6 @@ export default function App() {
                   
                   <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
                     <div>
-                      <h5 className="font-medium text-sm">Bulk Selection Default</h5>
-                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">When entering select mode, default to all snippets checked.</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" checked={bulkSelectDefaultAll} onChange={(e) => setBulkSelectDefaultAll(e.target.checked)} className="sr-only peer" />
-                      <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
-                    <div>
                       <h5 className="font-medium text-sm">Collection Sort Order</h5>
                       <p className="text-xs text-gray-500 dark:text-[#8b949e]">If 'Custom', drag and drop collections in the sidebar to reorder.</p>
                     </div>
@@ -1347,14 +1336,27 @@ export default function App() {
 
                   <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
                     <div>
-                      <h5 className="font-medium text-sm">Maximum Pins per Collection</h5>
-                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">Limit how many snippets can be pinned to the top.</p>
+                      <h5 className="font-medium text-sm">Bulk Selection Default</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">When entering select mode, default to all snippets checked.</p>
                     </div>
-                    <select value={maxPins} onChange={(e) => setMaxPins(parseInt(e.target.value))} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
-                      <option value="3">3 Pins</option>
-                      <option value="4">4 Pins</option>
-                      <option value="5">5 Pins</option>
-                    </select>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" checked={bulkSelectDefaultAll} onChange={(e) => setBulkSelectDefaultAll(e.target.checked)} className="sr-only peer" />
+                      <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
+                    <div>
+                      <h5 className="font-medium text-sm">Maximum Pins per Collection</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e]">Toggle between 3 pins and 5 pins per collection.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-gray-600 dark:text-[#8b949e]">{maxPins} Pins</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={maxPins === 5} onChange={(e) => setMaxPins(e.target.checked ? 5 : 3)} className="sr-only peer" />
+                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
                   </div>
 
                 </div>
