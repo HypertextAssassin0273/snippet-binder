@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Folder, FileCode, Plus, Save, Copy, 
   ExternalLink, Code, CheckCircle, Trash2, X, Edit2, 
   RefreshCw, Key, ChevronLeft, Menu, Sun, Moon, Share2,
-  Link as LinkIcon, Terminal, FileText, Box, Image as ImageIcon, Film
+  Link as LinkIcon, Terminal, FileText, Box, Image as ImageIcon, Film,
+  Settings, Download, Upload, CheckSquare, Square
 } from 'lucide-react';
 
 // Custom Github Icon
@@ -25,8 +26,23 @@ const GITHUB_CONFIG = {
 };
 
 // ==========================================
-// 💾 INDEXED-DB STORAGE WRAPPER
+// 💾 INDEXED-DB & VALIDATION WRAPPER
 // ==========================================
+const isValidSnippet = (s) => s && typeof s === 'object' && s.id && s.title && s.type;
+
+const validateDbFormat = (data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error("Invalid root database format");
+  const validDb = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (Array.isArray(value)) {
+      validDb[key] = value.filter(isValidSnippet);
+    } else {
+      validDb[key] = [];
+    }
+  }
+  return validDb;
+};
+
 const initDB = () => new Promise((resolve, reject) => {
   const req = indexedDB.open('DevBinder', 1);
   req.onupgradeneeded = () => req.result.createObjectStore('data');
@@ -52,6 +68,7 @@ const setLocalDb = async (val) => {
 const INITIAL_DB = { "My Snippets": [] };
 const utf8ToBase64 = (str) => btoa(Array.from(new TextEncoder().encode(str), byte => String.fromCodePoint(byte)).join(""));
 const getStoredToken = () => { try { return localStorage.getItem('gh_token') || ""; } catch { return ""; } };
+const isCliLanguage = (lang) => ['bash', 'shell', 'cmd', 'powershell', 'pwsh'].includes(lang?.toLowerCase());
 
 // ==========================================
 // 🧩 EMBED COMPONENTS
@@ -197,12 +214,13 @@ const CliViewer = ({ content }) => {
       </div>
       <pre className="whitespace-pre-wrap">
         {content.split('\n').map((line, i) => {
-          const isPrompt = line.match(/^[$>]\s+/);
+          // Supports standard unix prompts ($/ >) and Windows/Powershell paths (C:\..> / PS C:\..>)
+          const isPrompt = line.match(/^([$>]|PS\s+[^>]+>|[A-Z]:\\[^>]*>)\s*/i);
           const prompt = isPrompt ? isPrompt[0] : '';
           const text = line.substring(prompt.length);
           return (
             <div key={i} className="flex leading-relaxed hover:bg-[#161b22] px-1 rounded transition-colors">
-              <span className="text-[#3fb950] mr-2 select-none font-bold w-4 text-right">{prompt || '> '}</span>
+              <span className="text-[#3fb950] mr-2 select-none font-bold whitespace-nowrap">{prompt || '> '}</span>
               <span className="text-[#e6edf3] break-all">{text}</span>
             </div>
           );
@@ -216,10 +234,13 @@ export default function App() {
   const [db, setDb] = useState(null); 
   const [activeSection, setActiveSection] = useState("");
   const [activeSnippet, setActiveSnippet] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dragOverSection, setDragOverSection] = useState(null); // Track highlighted folder
   
-  // External Languages State
+  // Search & Selection
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const [dragOverSection, setDragOverSection] = useState(null); 
   const [prismLanguages, setPrismLanguages] = useState([]);
   
   // Layout States
@@ -229,18 +250,20 @@ export default function App() {
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
   });
-  const [mdPreview, setMdPreview] = useState(true); // Toggles MD preview vs raw
+  const [mdPreview, setMdPreview] = useState(true); 
 
-  // GitHub Sync States
+  // Settings & Sync States
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [ghToken, setGhToken] = useState(getStoredToken);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
   const [syncOnlyShared, setSyncOnlyShared] = useState(true);
   const [lastSyncedDb, setLastSyncedDb] = useState("");
 
+  const fileInputRef = useRef(null);
+
   // Modals / Form States
   const [isAdding, setIsAdding] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sectionPromptOpen, setSectionPromptOpen] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
@@ -252,7 +275,8 @@ export default function App() {
 
   const [formSection, setFormSection] = useState("");
   const [formTitle, setFormTitle] = useState("");
-  const [formType, setFormType] = useState("code");
+  const [formCategory, setFormCategory] = useState("code"); // 'code' | 'url'
+  const [formUrlType, setFormUrlType] = useState("link"); // 'link' | 'gist' | 'sandbox' | 'image' | 'video'
   const [formLangInput, setFormLangInput] = useState(""); 
   const [formTags, setFormTags] = useState("");
   const [formContent, setFormContent] = useState("");
@@ -260,7 +284,8 @@ export default function App() {
 
   const resetFormFields = () => {
     setFormTitle("");
-    setFormType("code");
+    setFormCategory("code");
+    setFormUrlType("link");
     setFormLangInput("");
     setFormTags("");
     setFormContent("");
@@ -269,7 +294,7 @@ export default function App() {
     setIsAdding(false);
   };
 
-  // Dynamic Component Loaders (Prism + Marked)
+  // Dynamic Component Loaders
   useEffect(() => {
     const prismCss = document.createElement('link');
     prismCss.rel = 'stylesheet';
@@ -298,9 +323,18 @@ export default function App() {
     return () => { document.head.removeChild(prismCss); document.body.removeChild(prismJs); };
   }, [theme]);
 
-  // Fetch languages
+  // Fetch and validate languages
   useEffect(() => {
-    fetch('./languages.json').then(res => res.json()).then(data => setPrismLanguages(data)).catch(() => {});
+    fetch('./languages.json').then(res => res.json()).then(data => {
+      if (Array.isArray(data)) setPrismLanguages(data);
+      else throw new Error("Invalid language format");
+    }).catch(() => {
+      setPrismLanguages([
+        { id: 'javascript', label: 'JavaScript (js)' },
+        { id: 'python', label: 'Python (py)' },
+        { id: 'plain', label: 'Plain Text (txt)' }
+      ]);
+    });
   }, []);
 
   useEffect(() => {
@@ -346,6 +380,13 @@ export default function App() {
       let localData = await getLocalDb();
       if (!localData) localData = INITIAL_DB;
       
+      try {
+        localData = validateDbFormat(localData);
+      } catch (err) {
+        console.warn("Local DB validation failed, resetting...", err);
+        localData = INITIAL_DB;
+      }
+      
       setDb(localData);
       setActiveSection(Object.keys(localData)[0] || "");
       setFormSection(Object.keys(localData)[0] || "");
@@ -356,7 +397,9 @@ export default function App() {
         if (res.status === 404) { setSyncStatus("No existing remote data found."); setLastSyncedDb(JSON.stringify(payloadDb)); return; }
         if (!res.ok) throw new Error("Failed to fetch deployed data.");
         
-        const remoteData = await res.json();
+        let remoteData = await res.json();
+        remoteData = validateDbFormat(remoteData);
+
         const mergedDb = { ...localData };
         Object.keys(remoteData).forEach(section => {
           if (!mergedDb[section]) mergedDb[section] = [];
@@ -372,7 +415,7 @@ export default function App() {
         setLastSyncedDb(JSON.stringify(remoteData));
         setSyncStatus("");
       } catch (err) {
-        console.warn("Local mode fallback:", err.message);
+        console.warn("Remote sync failed:", err.message);
         setSyncStatus("Local mode (Remote unreachable).");
         setLastSyncedDb(JSON.stringify(payloadDb)); 
       }
@@ -411,20 +454,101 @@ export default function App() {
     }
   };
 
+  const handleJSONImport = (e, overwrite = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        const validated = validateDbFormat(parsed);
+        
+        if (overwrite) {
+          setDb(validated);
+        } else {
+          setDb(prev => {
+            const merged = { ...prev };
+            Object.keys(validated).forEach(section => {
+              if (!merged[section]) merged[section] = [];
+              validated[section].forEach(incomingSnippet => {
+                const localIndex = merged[section].findIndex(s => s.id === incomingSnippet.id);
+                if (localIndex >= 0) merged[section][localIndex] = incomingSnippet;
+                else merged[section].push(incomingSnippet);
+              });
+            });
+            return merged;
+          });
+        }
+        setSyncStatus(`Successfully ${overwrite ? 'overwritten from' : 'merged'} JSON backup.`);
+        setTimeout(() => setSyncStatus(""), 4000);
+      } catch (err) {
+        setSyncStatus(`Import Error: ${err.message}`);
+      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsText(file);
+  };
+
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `devbinder_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Bulk Operations
+  const handleBulkAction = (action) => {
+    setDb(prev => {
+      const newDb = { ...prev };
+      if (action === 'delete') {
+        newDb[activeSection] = newDb[activeSection].filter(s => !selectedIds.has(s.id));
+        if (newDb[activeSection].length === 0) {
+          delete newDb[activeSection];
+          setActiveSection(Object.keys(newDb)[0] || "");
+        }
+      } else {
+        const isSharedTarget = action === 'share';
+        newDb[activeSection] = newDb[activeSection].map(s => selectedIds.has(s.id) ? { ...s, isShared: isSharedTarget } : s);
+      }
+      return newDb;
+    });
+    setSelectedIds(new Set());
+    if (action === 'delete' && activeSnippet && selectedIds.has(activeSnippet.id)) setActiveSnippet(null);
+  };
+
   useEffect(() => { if (activeSnippet && activeSnippet.type === 'code' && window.Prism) window.Prism.highlightAll(); }, [activeSnippet, mdPreview]);
 
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
   const sections = Object.keys(db);
+  
+  // Advanced Search Filtering
+  const queryTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
   const filteredSnippets = (db[activeSection] || []).filter(s => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return s.title.toLowerCase().includes(q) || s.tags.some(t => t.toLowerCase().includes(q)) || (s.content && s.content.toLowerCase().includes(q));
+    if (queryTokens.length === 0) return true;
+    
+    // Strict exact tag match or whole-word content match
+    return queryTokens.every(token => {
+      // 1. Tag exact match or starts-with
+      if (s.tags.some(t => t.toLowerCase().startsWith(token))) return true;
+      // 2. Title/Content Word Boundary Match
+      const searchContent = `${s.title} ${s.content || ''} ${s.url || ''}`.toLowerCase();
+      // Regex \b checks for word boundaries, so 'dd' won't match inside 'address'
+      try {
+        const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+        return regex.test(searchContent);
+      } catch {
+        return searchContent.includes(token); // Fallback
+      }
+    });
   });
 
   const getIconForType = (type, language, size = 16) => {
     if (type === 'code' && language === 'markdown') return <FileText size={size} />;
-    if (type === 'code' && ['bash', 'shell'].includes(language)) return <Terminal size={size} />;
+    if (type === 'code' && isCliLanguage(language)) return <Terminal size={size} />;
     switch (type) {
       case 'gist': return <Github size={size} />;
       case 'link': return <LinkIcon size={size} />;
@@ -439,9 +563,8 @@ export default function App() {
     if (!activeSnippet) return;
     let textToCopy = activeSnippet.url || activeSnippet.content;
     
-    // Smart copy: Strip CLI prompts if language is bash/shell
-    if (activeSnippet.type === 'code' && ['bash', 'shell'].includes(activeSnippet.language)) {
-      textToCopy = textToCopy.replace(/^[$>]\s+/gm, '');
+    if (activeSnippet.type === 'code' && isCliLanguage(activeSnippet.language)) {
+      textToCopy = textToCopy.replace(/^([$>]|PS\s+[^>]+>|[A-Z]:\\[^>]*>)\s*/gim, '');
     }
     
     navigator.clipboard.writeText(textToCopy);
@@ -472,8 +595,11 @@ export default function App() {
   const openEditSnippetModal = () => {
     if (!activeSnippet) return;
     setFormTitle(activeSnippet.title);
-    setFormType(activeSnippet.type);
     
+    const isUrl = ['link', 'gist', 'sandbox', 'image', 'video'].includes(activeSnippet.type);
+    setFormCategory(isUrl ? 'url' : 'code');
+    setFormUrlType(isUrl ? activeSnippet.type : 'link');
+
     const foundLang = prismLanguages.find(l => l.id === activeSnippet.language);
     setFormLangInput(foundLang ? foundLang.label : (activeSnippet.language || ""));
     
@@ -489,16 +615,16 @@ export default function App() {
     e.preventDefault();
     
     const finalLangId = prismLanguages.find(l => l.label === formLangInput)?.id || formLangInput.trim().toLowerCase();
-    const isUrlType = ['link', 'gist', 'sandbox', 'image', 'video'].includes(formType);
+    const finalType = formCategory === 'url' ? formUrlType : 'code';
 
     const snippetData = {
       id: editingSnippetId || Date.now().toString(),
       title: formTitle,
-      type: formType,
+      type: finalType,
       language: finalLangId,
       tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
       isShared: formIsShared,
-      ...(isUrlType ? { url: formContent } : { content: formContent })
+      ...(formCategory === 'url' ? { url: formContent } : { content: formContent })
     };
 
     setDb(prev => {
@@ -642,7 +768,7 @@ export default function App() {
                      onDragLeave={() => setDragOverSection(null)}
                      onDrop={(e) => handleDropSnippet(e, section)}
                 >
-                  <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${dragOverSection === section ? 'bg-blue-200 dark:bg-[#388bfd]/30' : (activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]')}`}>
+                  <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); setIsSelectionMode(false); setSelectedIds(new Set()); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${dragOverSection === section ? 'bg-blue-200 dark:bg-[#388bfd]/30' : (activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]')}`}>
                     <Folder size={16} className={activeSection === section || dragOverSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
                     <span className="truncate flex-1 text-left">{section}</span>
                   </button>
@@ -657,13 +783,13 @@ export default function App() {
 
           <div className="p-4 border-t border-gray-200 dark:border-[#30363d] space-y-2 min-w-[255px]">
             <button onClick={() => setSectionPromptOpen(true)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium bg-white dark:bg-[#21262d] border border-gray-300 dark:border-[#30363d] rounded-md hover:bg-gray-50 dark:hover:bg-[#30363d]"><Plus size={16} /> New Collection</button>
-            <button onClick={() => setIsExporting(true)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 dark:bg-[#238636] dark:hover:bg-[#2ea043] border border-transparent dark:border-[#2ea043] rounded-md"><RefreshCw size={16} /> Sync Config</button>
+            <button onClick={() => setIsSettingsOpen(true)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-transparent dark:border-[#30363d] rounded-md"><Settings size={16} /> Settings</button>
           </div>
         </div>
       </div>
 
       {/* MIDDLE PANE */}
-      <div className="flex-shrink-0 bg-white dark:bg-[#0d1117] flex flex-col" style={{ width: `${middlePaneWidth}px` }}>
+      <div className="flex-shrink-0 bg-white dark:bg-[#0d1117] flex flex-col relative" style={{ width: `${middlePaneWidth}px` }}>
         <div className="p-4 border-b border-gray-200 dark:border-[#30363d] space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -675,8 +801,8 @@ export default function App() {
               <h2 className="font-semibold truncate pr-2">{activeSection || "Snippets"}</h2>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d] rounded-md transition-colors" title="Toggle Theme">
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              <button onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds(new Set()); }} className={`p-1.5 rounded-md transition-colors ${isSelectionMode ? 'bg-blue-100 text-blue-600 dark:bg-[#1f6feb]/20 dark:text-[#58a6ff]' : 'text-gray-500 hover:bg-gray-100 dark:text-[#8b949e] dark:hover:text-white dark:hover:bg-[#30363d]'}`} title="Select Multiple">
+                <CheckSquare size={16} />
               </button>
               <button onClick={() => { 
                 resetFormFields();
@@ -693,6 +819,18 @@ export default function App() {
           </div>
         </div>
 
+        {/* Bulk Action Bar */}
+        {isSelectionMode && selectedIds.size > 0 && (
+          <div className="bg-blue-50 dark:bg-[#1f6feb]/10 border-b border-blue-100 dark:border-[#1f6feb]/20 p-2 flex items-center justify-between shadow-sm z-10">
+            <span className="text-xs font-semibold text-blue-700 dark:text-[#58a6ff] px-2">{selectedIds.size} Selected</span>
+            <div className="flex gap-1">
+              <button onClick={() => handleBulkAction('share')} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Make Shareable"><Share2 size={12}/></button>
+              <button onClick={() => handleBulkAction('private')} className="px-2 py-1 text-xs bg-white dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded hover:bg-gray-50 dark:hover:bg-[#30363d] text-gray-700 dark:text-[#c9d1d9]" title="Make Private"><Key size={12}/></button>
+              <button onClick={() => handleBulkAction('delete')} className="px-2 py-1 text-xs bg-red-50 dark:bg-[#f85149]/10 border border-red-100 dark:border-[#f85149]/20 text-red-600 dark:text-[#f85149] rounded hover:bg-red-100 dark:hover:bg-[#f85149]/20" title="Delete"><Trash2 size={12}/></button>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto">
           {filteredSnippets.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-[#8b949e] text-sm">No snippets found.</div>
@@ -700,14 +838,27 @@ export default function App() {
             <ul className="divide-y divide-gray-100 dark:divide-[#21262d]">
               {filteredSnippets.map(snippet => (
                 <li key={snippet.id}
-                    draggable
+                    draggable={!isSelectionMode}
                     onDragStart={(e) => {
+                      if (isSelectionMode) return;
                       e.dataTransfer.setData('snippetId', snippet.id);
                       e.dataTransfer.setData('sourceSection', activeSection);
                     }}
-                    className="cursor-grab active:cursor-grabbing"
+                    className={`flex items-stretch ${!isSelectionMode && 'cursor-grab active:cursor-grabbing'}`}
                 >
-                  <button onClick={() => { setActiveSnippet(snippet); setMdPreview(true); }} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
+                  {isSelectionMode && (
+                    <div className="pl-4 py-4 flex items-start bg-white dark:bg-[#0d1117] border-b border-transparent">
+                      <button onClick={() => {
+                        const newSet = new Set(selectedIds);
+                        if (newSet.has(snippet.id)) newSet.delete(snippet.id);
+                        else newSet.add(snippet.id);
+                        setSelectedIds(newSet);
+                      }} className="text-gray-400 hover:text-blue-500 dark:text-[#8b949e] dark:hover:text-[#58a6ff]">
+                        {selectedIds.has(snippet.id) ? <CheckSquare size={16} className="text-blue-500 dark:text-[#58a6ff]" /> : <Square size={16} />}
+                      </button>
+                    </div>
+                  )}
+                  <button onClick={() => { if(!isSelectionMode) { setActiveSnippet(snippet); setMdPreview(true); } }} className={`flex-1 text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
                       {getIconForType(snippet.type, snippet.language)}
                     </div>
@@ -767,7 +918,7 @@ export default function App() {
               {activeSnippet.type === 'code' ? (
                 (activeSnippet.language === 'markdown' && mdPreview) ? (
                   <MarkdownViewer content={activeSnippet.content} />
-                ) : activeSnippet.language === 'bash' || activeSnippet.language === 'shell' ? (
+                ) : isCliLanguage(activeSnippet.language) ? (
                   <CliViewer content={activeSnippet.content} />
                 ) : (
                   <div className="prism-code-override h-full">
@@ -804,47 +955,85 @@ export default function App() {
         )}
       </div>
 
-      {/* EXPORT / SAVE TO REPO MODAL */}
-      {isExporting && (
+      {/* SETTINGS / DATA MODAL */}
+      {isSettingsOpen && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white dark:bg-[#161b22] w-full max-w-3xl rounded-xl shadow-2xl border border-gray-200 dark:border-[#30363d] overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-[#30363d]">
-               <h3 className="text-lg font-semibold flex items-center gap-2"><Github size={18}/> GitHub Synchronization</h3>
-               <button onClick={() => setIsExporting(false)} className="text-gray-500 hover:text-gray-900 dark:text-[#8b949e] dark:hover:text-white"><X size={20} /></button>
+            <div className="px-6 py-4 flex justify-between items-center border-b border-gray-200 dark:border-[#30363d] bg-gray-50 dark:bg-[#0d1117]">
+               <h3 className="text-lg font-semibold flex items-center gap-2"><Settings size={18}/> Global Settings</h3>
+               <button onClick={() => setIsSettingsOpen(false)} className="text-gray-500 hover:text-gray-900 dark:text-[#8b949e] dark:hover:text-white"><X size={20} /></button>
             </div>
             
-            <div className="p-6 flex-grow overflow-y-auto flex flex-col gap-6">
-              <div className="bg-gray-50 dark:bg-[#0d1117] border border-gray-200 dark:border-[#30363d] rounded-lg p-5">
-                <h4 className="font-medium mb-4 flex items-center gap-2"><RefreshCw size={16} /> Direct API Sync (to {GITHUB_CONFIG.BRANCH})</h4>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 dark:text-[#8b949e] mb-1">GitHub PAT</label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Key className="absolute left-3 top-2.5 text-gray-400 dark:text-[#8b949e]" size={14} />
-                        <input type="password" value={ghToken} onChange={(e) => { setGhToken(e.target.value); localStorage.setItem('gh_token', e.target.value); }} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md pl-9 pr-3 py-1.5 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
-                      </div>
-                      <button onClick={saveToGitHub} disabled={isSyncing || !ghToken || !hasChanges} className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors border ${isSyncing || !ghToken || !hasChanges ? 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-[#21262d] dark:text-[#8b949e] dark:border-[#30363d] cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white border-transparent dark:bg-[#238636] dark:hover:bg-[#2ea043] dark:border-[#2ea043]'}`}>
-                        {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} {hasChanges ? 'Push Changes' : 'Up to date'}
-                      </button>
+            <div className="p-6 flex-grow overflow-y-auto flex flex-col gap-8">
+              
+              {/* Data Backup Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold border-b border-gray-200 dark:border-[#30363d] pb-2 text-gray-800 dark:text-white flex items-center gap-2"><Folder size={16} className="text-blue-500" /> Local Data Management</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 dark:bg-[#1f6feb]/10 border border-blue-100 dark:border-[#1f6feb]/20 rounded-lg p-4 flex flex-col items-start gap-3">
+                    <div>
+                      <h5 className="font-medium text-sm text-blue-800 dark:text-[#58a6ff]">Export Backup</h5>
+                      <p className="text-xs text-blue-600/80 dark:text-[#58a6ff]/70 mt-1">Download your entire vault as a JSON file.</p>
                     </div>
-                    
-                    <div className="mt-4 flex items-center gap-2">
-                      <input type="checkbox" id="syncShared" checked={syncOnlyShared} onChange={(e) => setSyncOnlyShared(e.target.checked)} className="rounded border-gray-300 dark:border-[#30363d]" />
-                      <label htmlFor="syncShared" className="text-sm text-gray-700 dark:text-[#c9d1d9] cursor-pointer">Only push snippets marked as <span className="font-semibold text-blue-600 dark:text-[#58a6ff]">Shared</span></label>
+                    <button onClick={exportJSON} className="mt-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center gap-2 transition-colors"><Download size={14}/> Export JSON</button>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4 flex flex-col items-start gap-3">
+                    <div>
+                      <h5 className="font-medium text-sm">Import Data</h5>
+                      <p className="text-xs text-gray-500 dark:text-[#8b949e] mt-1">Upload a DevBinder JSON backup.</p>
+                    </div>
+                    <input type="file" accept=".json" ref={fileInputRef} className="hidden" onChange={(e) => handleJSONImport(e, false)} />
+                    <div className="flex gap-2 mt-auto w-full">
+                      <button onClick={() => fileInputRef.current.click()} className="flex-1 px-3 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-[#30363d] dark:hover:bg-[#484f58] text-gray-800 dark:text-white rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors"><Upload size={14}/> Merge File</button>
+                      <button onClick={() => { if(window.confirm('This will wipe your current database. Proceed?')) { fileInputRef.current.onchange = (e) => handleJSONImport(e, true); fileInputRef.current.click(); } }} className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-[#f85149] dark:hover:bg-red-900/20 rounded-md text-sm font-medium transition-colors">Overwrite</button>
                     </div>
                   </div>
-                  {syncStatus && <div className={`p-3 rounded-md text-sm ${syncStatus.includes('Error') ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900' : 'bg-green-50 text-green-700 border-green-200 dark:bg-[#238636]/20 dark:text-[#3fb950] dark:border-[#2ea043]/30'}`}>{syncStatus}</div>}
                 </div>
               </div>
 
-              <div className="bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-5">
-                <h4 className="font-medium mb-2">Manual Fallback Payload</h4>
-                <div className="relative h-48">
-                  <textarea readOnly className="w-full h-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-4 font-mono text-xs text-blue-600 dark:text-[#58a6ff] focus:outline-none resize-none" value={JSON.stringify(payloadDb, null, 2)} />
-                  <button onClick={() => handleCopy(JSON.stringify(payloadDb, null, 2))} className="absolute top-4 right-4 bg-gray-800 hover:bg-gray-700 dark:bg-[#30363d] dark:hover:bg-[#484f58] text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors">{copied ? <CheckCircle size={14} /> : <Copy size={14} />} Copy JSON</button>
+              {/* GitHub Sync Section */}
+              <div className="space-y-4">
+                <h4 className="font-semibold border-b border-gray-200 dark:border-[#30363d] pb-2 text-gray-800 dark:text-white flex items-center gap-2"><Github size={16} /> GitHub API Synchronization</h4>
+                <div className="bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-5">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 dark:text-[#8b949e] mb-1">GitHub Personal Access Token (PAT)</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Key className="absolute left-3 top-2.5 text-gray-400 dark:text-[#8b949e]" size={14} />
+                          <input type="password" value={ghToken} onChange={(e) => { setGhToken(e.target.value); localStorage.setItem('gh_token', e.target.value); }} placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" className="w-full bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md pl-9 pr-3 py-1.5 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" />
+                        </div>
+                        <button onClick={saveToGitHub} disabled={isSyncing || !ghToken || !hasChanges} className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors border ${isSyncing || !ghToken || !hasChanges ? 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-[#21262d] dark:text-[#8b949e] dark:border-[#30363d] cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white border-transparent dark:bg-[#238636] dark:hover:bg-[#2ea043] dark:border-[#2ea043]'}`}>
+                          {isSyncing ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} {hasChanges ? 'Push Changes' : 'Up to date'}
+                        </button>
+                      </div>
+                      
+                      <div className="mt-4 flex items-center gap-2">
+                        <input type="checkbox" id="syncShared" checked={syncOnlyShared} onChange={(e) => setSyncOnlyShared(e.target.checked)} className="rounded border-gray-300 dark:border-[#30363d]" />
+                        <label htmlFor="syncShared" className="text-sm text-gray-700 dark:text-[#c9d1d9] cursor-pointer">Only push snippets marked as <span className="font-semibold text-blue-600 dark:text-[#58a6ff]">Shared</span></label>
+                      </div>
+                    </div>
+                    {syncStatus && <div className={`p-3 rounded-md text-sm ${syncStatus.includes('Error') ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900' : 'bg-green-50 text-green-700 border-green-200 dark:bg-[#238636]/20 dark:text-[#3fb950] dark:border-[#2ea043]/30'}`}>{syncStatus}</div>}
+                  </div>
                 </div>
               </div>
+
+              {/* Preferences */}
+              <div className="space-y-4">
+                <h4 className="font-semibold border-b border-gray-200 dark:border-[#30363d] pb-2 text-gray-800 dark:text-white flex items-center gap-2"><Sun size={16} className="text-yellow-500" /> Preferences</h4>
+                <div className="flex items-center justify-between bg-gray-50 dark:bg-[#21262d] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
+                  <div>
+                    <h5 className="font-medium text-sm">Application Theme</h5>
+                    <p className="text-xs text-gray-500 dark:text-[#8b949e]">Toggle between light and dark modes.</p>
+                  </div>
+                  <select value={theme} onChange={(e) => setTheme(e.target.value)} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                    <option value="light">Light Mode</option>
+                    <option value="dark">Dark Mode</option>
+                  </select>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -872,38 +1061,48 @@ export default function App() {
                 </div>
                 <div className="flex gap-4">
                   <div className="w-1/3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Source Type</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Source Category</label>
                     <select 
-                      value={formType} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setFormType(val);
-                        if (['sandbox', 'link', 'gist', 'image', 'video'].includes(val)) setFormLangInput("");
-                      }} 
+                      value={formCategory} 
+                      onChange={e => setFormCategory(e.target.value)} 
                       className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none"
                     >
                       <option value="code">Raw Code</option>
-                      <option value="image">Image URL</option>
-                      <option value="video">Video URL</option>
-                      <option value="sandbox">Code Sandbox (Embed)</option>
-                      <option value="gist">GitHub Gist URL</option>
-                      <option value="link">Web Link / Video URL</option>
+                      <option value="url">External URL / Media</option>
                     </select>
                   </div>
-                  <div className={`w-1/3 ${['link', 'gist', 'sandbox', 'image', 'video'].includes(formType) ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
-                    <input 
-                      type="text" 
-                      list="prism-languages"
-                      value={formLangInput} 
-                      onChange={e=>setFormLangInput(e.target.value)} 
-                      disabled={['link', 'gist', 'sandbox', 'image', 'video'].includes(formType)} 
-                      className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none disabled:bg-gray-100 dark:disabled:bg-[#21262d]" 
-                      placeholder="e.g. javascript" 
-                    />
-                    <datalist id="prism-languages">
-                      {prismLanguages.map(lang => <option key={lang.id} value={lang.label} />)}
-                    </datalist>
+                  <div className="w-1/3">
+                    {formCategory === 'code' ? (
+                      <>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Language</label>
+                        <input 
+                          type="text" 
+                          list="prism-languages"
+                          value={formLangInput} 
+                          onChange={e=>setFormLangInput(e.target.value)} 
+                          className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" 
+                          placeholder="e.g. javascript" 
+                        />
+                        <datalist id="prism-languages">
+                          {prismLanguages.map(lang => <option key={lang.id} value={lang.label} />)}
+                        </datalist>
+                      </>
+                    ) : (
+                      <>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Media Type</label>
+                        <select 
+                          value={formUrlType} 
+                          onChange={e => setFormUrlType(e.target.value)} 
+                          className="w-full bg-white dark:bg-[#0d1117] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none"
+                        >
+                          <option value="link">Web Link</option>
+                          <option value="image">Image URL</option>
+                          <option value="video">Video URL (YT/MP4)</option>
+                          <option value="sandbox">Code Sandbox Embed</option>
+                          <option value="gist">GitHub Gist URL</option>
+                        </select>
+                      </>
+                    )}
                   </div>
                   <div className="w-1/3">
                     <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">Tags (comma sep)</label>
@@ -920,9 +1119,9 @@ export default function App() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-[#c9d1d9] mb-1">
-                    {formType === 'code' ? 'Content' : 'URL'}
+                    {formCategory === 'code' ? 'Content' : 'URL'}
                   </label>
-                  {formType === 'code' ? (
+                  {formCategory === 'code' ? (
                     <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-40 min-h-[120px] max-h-[60vh] focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> 
                   ) : (
                     <input required type="url" value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 font-mono text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" placeholder="https://" />
