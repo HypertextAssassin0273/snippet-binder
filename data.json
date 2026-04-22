@@ -1,4 +1,157 @@
 {
+  "Codes": [
+    {
+      "id": "1776824124384",
+      "title": "Retry Decorator",
+      "type": "code",
+      "language": "python",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "import time\nfrom functools import wraps\n\ndef retry(attempts=3, delay=1):\n    def decorator(func):\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            for i in range(attempts):\n                try:\n                    return func(*args, **kwargs)\n                except Exception as e:\n                    if i == attempts - 1:\n                        raise\n                    time.sleep(delay)\n        return wrapper\n    return decorator",
+      "_score": 1,
+      "isPinned": false
+    },
+    {
+      "id": "1776824143837",
+      "title": "Quick Backup Script",
+      "type": "code",
+      "language": "bash",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "#!/bin/bash\n\nSRC=\"/var/www/app\"\nDEST=\"/backup/app_$(date +%F).tar.gz\"\n\ntar -czf \"$DEST\" \"$SRC\" && echo \"Backup created at $DEST\"",
+      "_score": 1,
+      "isPinned": true
+    },
+    {
+      "id": "1776824179769",
+      "title": "Debounce Function",
+      "type": "code",
+      "language": "javascript",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "function debounce(fn, delay = 300) {\n  let timeout;\n  return (...args) => {\n    clearTimeout(timeout);\n    timeout = setTimeout(() => fn(...args), delay);\n  };\n}",
+      "_score": 1,
+      "isPinned": false
+    },
+    {
+      "id": "1776824207456",
+      "title": "Simple Auth Check Middleware",
+      "type": "code",
+      "language": "python",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "from flask import request, redirect, session\n\ndef login_required(f):\n    def wrapper(*args, **kwargs):\n        if not session.get(\"user\"):\n            return redirect(\"/login\")\n        return f(*args, **kwargs)\n    wrapper.__name__ = f.__name__\n    return wrapper"
+    },
+    {
+      "id": "1776824232238",
+      "title": "Basic Reverse Proxy Config",
+      "type": "code",
+      "language": "nginx",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "server {\n    listen 80;\n    server_name example.com;\n\n    location / {\n        proxy_pass http://127.0.0.1:5000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n    }\n}",
+      "_score": 1,
+      "isPinned": true
+    },
+    {
+      "id": "1776824257213",
+      "title": "Upsert (Insert or Update)",
+      "type": "code",
+      "language": "sql",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "INSERT INTO users (id, name, email)\nVALUES (1, 'John', 'john@example.com')\nON CONFLICT (id)\nDO UPDATE SET\n  name = EXCLUDED.name,\n  email = EXCLUDED.email;",
+      "_score": 1,
+      "isPinned": true
+    },
+    {
+      "id": "1776824278512",
+      "title": "Copy to Clipboard",
+      "type": "code",
+      "language": "javascript",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "async function copyToClipboard(text) {\n  try {\n    await navigator.clipboard.writeText(text);\n    console.log(\"Copied!\");\n  } catch (err) {\n    console.error(\"Failed to copy:\", err);\n  }\n}",
+      "_score": 1,
+      "isPinned": false
+    },
+    {
+      "id": "1776824346982",
+      "title": "Load .env Safely",
+      "type": "code",
+      "language": "python",
+      "tags": [
+        "code"
+      ],
+      "isShared": false,
+      "content": "from pathlib import Path\n\ndef load_env(file=\".env\"):\n    for line in Path(file).read_text().splitlines():\n        if line and not line.startswith(\"#\"):\n            key, value = line.split(\"=\", 1)\n            os.environ[key.strip()] = value.strip()"
+    }
+  ],
+  "_Workflows": [
+    {
+      "id": "1776820759788",
+      "title": "repo workflows for flask app deployment on VPS",
+      "type": "gist",
+      "language": "",
+      "tags": [
+        "workflows"
+      ],
+      "isShared": false,
+      "url": "https://gist.github.com/HypertextAssassin0273/76e348f2e93497be07f3241bb5351f18"
+    }
+  ],
+  "Markdowns": [
+    {
+      "id": "1776820558857",
+      "title": "GCS App README",
+      "type": "code",
+      "language": "markdown",
+      "tags": [
+        "github",
+        "readme"
+      ],
+      "isShared": false,
+      "content": "# Google Custom Search\n\nThis is a simple web application that uses the **Google Custom Search API** to search for items on mentioned websites in **selected custom search engine**. \n\nThe results are **grouped** by their corresponding website domain, making it easier for the user to identify the source of the similar search results.\n\nSince the results are **preloaded** (requires proxy support), the user can very quickly preview search results in different pane on the same page, providing a smooth experience. \n\n## How to run the application?\n\n### 1. Install dependencies\nInstall **python packages** by running the following command:\n```bash\npip install -r requirements.txt\n```\n**Note:** make sure to have the latest pip version using `pip install --upgrade pip`.\n\n### 2. Set the environment variables\nCreate `search_engines.env` file in the `data/` directory and set as many **search engines** as you want:\n```bash\nSEARCH_ENGINE_ID_1='<your_cse_id_1>'\nSEARCH_ENGINE_ID_2='<your_cse_id_2>'\n...\nSEARCH_ENGINE_ID_N='<your_cse_id_N>'\n```\n\nSimilarly, create `api_keys.env` file in the `data/` directory and set as many **API keys** as you want:\n\n```bash\nAPI_KEY_1='<your_cs_json_api_key_1>'\nAPI_KEY_2='<your_cs_json_api_key_2>'\n...\nAPI_KEY_N='<your_cs_json_api_key_N>'\n```\n\n**Note:** there is no restriction on naming the environment variables. you can also add spaces in their names, e.g. `'My API Key'='<cs_json_api_key>'`, `'My Search Engine'='<cse_id>'`, etc. the only restriction is that the names should be unique.\n\n#### 2.1. Setup the credentials\nCreate a `credentials.env` file in the `data/` directory and set the following variables:\n\n```bash\nFLASK_SECRET_KEY='<your_flask_secret_key>'\nadmin='<your_admin_password>'\nemployee1='<your_employee1_password>'\n...\nemployeeN='<your_employeeN_password>'\n```\n\n**Note:** generate a secure random string for `FLASK_SECRET_KEY` using `python -c \"import secrets; print(secrets.token_hex(32))\"`. This will be used to secure the session cookies and other sensitive data in the application.\n\n### 3. Run the script to start the server\n```bash\npython app.py\n```\n**Note:** developed on python `3.13.1` version\n\n### 4. Open the browser and go to the following URL\n```bash\nhttp://127.0.0.1:5000\n```\n**Note**: default port is `5000`\n\n## Prerequisites\n\nYou need to have atleast one of both **Custom Search JSON API Key** and a **Custom Search Engine ID** to run this application. You can get them from [Google Custom Search](https://developers.google.com/custom-search/v1/overview).\n\n\n## Additional Features \n\n### 1. Website Previewer Tab\nThis application also provides a **website previewer** tab, which allows you to quickly preview the websites imported from an excel file.\n\nYou can add websites under different categories in the `websites.xlsx` file. The application will automatically load the websites from the excel file and display them accordingly in the previewer tab.\n\n**Note:** make sure to upload `websites.xlsx` file and ensure that the websites are in the correct format and accessible. otherwise, it will not work correctly.\n\n### 2. Proxy Support (requests user-agent)\nIf you want to optimize **page-search** results of a specific website, you can add that website's **domain** name in `proxied_websites.txt` file. The application will automatically fetch and cache the proxied content for all the pages of that website.\n\nYou can use this feature to fetch some annoying websites faster, cache their content, prevent them from being blocked (by CORS, strict CSP, etc.), and view their content super efficiently.\n\n**Note:** this feature works for both **website previewer** and **search results** tabs.\n"
+    }
+  ],
+  "Images": [
+    {
+      "id": "1776821417885",
+      "title": "GCS App favicon",
+      "type": "image",
+      "language": "",
+      "tags": [
+        "photo"
+      ],
+      "isShared": false,
+      "url": "https://cdn.calyxtech.net/google-custom-search/favicon-192x192.png"
+    },
+    {
+      "id": "1776823695599",
+      "title": "unsplash random cover 1",
+      "type": "image",
+      "language": "",
+      "tags": [
+        "photo"
+      ],
+      "isShared": false,
+      "url": "https://plus.unsplash.com/premium_photo-1683865776032-07bf70b0add1"
+    }
+  ],
   "Infrastructure": [
     {
       "id": "1776786720728",
@@ -10,6 +163,59 @@
       ],
       "isShared": true,
       "url": "https://gist.github.com/Digiflexsolution/5df89911837a3ae8d4611207c573f9c1"
+    },
+    {
+      "id": "1776821370773",
+      "title": "dummy pdf",
+      "type": "link",
+      "language": "",
+      "tags": [
+        "pdf"
+      ],
+      "isShared": false,
+      "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+    }
+  ],
+  "Misc": [
+    {
+      "id": "1776821164053",
+      "title": "Basic Node.js Dockerfile",
+      "type": "code",
+      "language": "docker",
+      "tags": [
+        "IAAC"
+      ],
+      "isShared": false,
+      "revisions": [
+        {
+          "ts": 1776836416618,
+          "content": "FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD [\"npm\", \"start\"]\n```"
+        }
+      ],
+      "content": "FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD [\"npm\", \"start\"]\n"
+    },
+    {
+      "id": "1776821480304",
+      "title": "google drive link dummy",
+      "type": "link",
+      "language": "",
+      "tags": [
+        "drive"
+      ],
+      "isShared": false,
+      "url": "https://drive.google.com/file/d/12345XYZ/view?usp=sharing"
+    },
+    {
+      "id": "1776822627925",
+      "title": "O-MAATA research report",
+      "type": "link",
+      "language": "",
+      "tags": [
+        "dsa",
+        "pdf"
+      ],
+      "isShared": false,
+      "url": "https://hypertextassassin0273.github.io/assets/img/projects/DS-R-Project_Report.pdf"
     }
   ]
 }
