@@ -248,9 +248,6 @@ export default function App() {
 
   useEffect(() => { if (db !== null) setLocalDb(db); }, [db]);
   
-  // Reset preview mode when changing snippets
-  useEffect(() => { setMdPreview(true); }, [activeSnippet?.id]);
-
   // Handle Drag Resizing
   useEffect(() => {
     if (!isDragging) return;
@@ -438,6 +435,7 @@ export default function App() {
 
     setActiveSection(formSection);
     setActiveSnippet(snippetData);
+    setMdPreview(true);
     resetFormFields();
   };
 
@@ -464,6 +462,7 @@ export default function App() {
         return newDb;
       });
       setActiveSnippet(null);
+      setMdPreview(true);
       setDeleteConfirmId(null);
     }
   };
@@ -495,6 +494,7 @@ export default function App() {
         const remaining = Object.keys(db).filter(k => k !== deleteCollectionConfirm);
         setActiveSection(remaining[0] || "");
         setActiveSnippet(null);
+        setMdPreview(true);
       }
       setDeleteCollectionConfirm(null);
     }
@@ -553,7 +553,7 @@ export default function App() {
             <nav className="space-y-0.5 px-2">
               {sections.map(section => (
                 <div key={section} className="relative group">
-                  <button onClick={() => { setActiveSection(section); setActiveSnippet(null); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]'}`}>
+                  <button onClick={() => { setActiveSection(section); setActiveSnippet(null); setMdPreview(true); }} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeSection === section ? 'bg-blue-100 text-blue-700 dark:bg-[#1f6feb] dark:text-white' : 'text-gray-700 hover:bg-gray-200 dark:text-[#c9d1d9] dark:hover:bg-[#30363d]'}`}>
                     <Folder size={16} className={activeSection === section ? "text-blue-700 dark:text-white" : "text-gray-400 dark:text-[#8b949e] flex-shrink-0"} />
                     <span className="truncate flex-1 text-left">{section}</span>
                   </button>
@@ -611,7 +611,7 @@ export default function App() {
             <ul className="divide-y divide-gray-100 dark:divide-[#21262d]">
               {filteredSnippets.map(snippet => (
                 <li key={snippet.id}>
-                  <button onClick={() => setActiveSnippet(snippet)} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
+                  <button onClick={() => { setActiveSnippet(snippet); setMdPreview(true); }} className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#161b22] transition-colors flex items-start gap-3 ${activeSnippet?.id === snippet.id ? 'bg-blue-50 border-blue-500 dark:bg-[#161b22] border-l-2 dark:border-[#58a6ff]' : 'border-l-2 border-transparent'}`}>
                     <div className="mt-0.5 text-gray-400 dark:text-[#8b949e]">
                       {getIconForType(snippet.type, snippet.language)}
                     </div>
@@ -819,7 +819,7 @@ export default function App() {
                     {formType === 'code' ? 'Content' : 'URL'}
                   </label>
                   {formType === 'code' ? (
-                    <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-64 focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> 
+                    <textarea required value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-3 font-mono text-sm h-40 min-h-[120px] max-h-[60vh] focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none resize-y" /> 
                   ) : (
                     <input required type="url" value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full bg-gray-50 dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 font-mono text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none" placeholder="https://" />
                   )}
