@@ -70,6 +70,11 @@ const INITIAL_DB = { "My Snippets": [] };
 const utf8ToBase64 = (str) => btoa(Array.from(new TextEncoder().encode(str), byte => String.fromCodePoint(byte)).join(""));
 const getStoredToken = () => { try { return localStorage.getItem('gh_token') || ""; } catch { return ""; } };
 const isCliLanguage = (lang) => ['bash', 'shell', 'cmd', 'powershell', 'pwsh'].includes(lang?.toLowerCase());
+const getOrderedSections = (sections, order) => {
+  if (order === 'asc') return [...sections].sort((a, b) => a.localeCompare(b));
+  if (order === 'desc') return [...sections].sort((a, b) => b.localeCompare(a));
+  return sections;
+};
 
 // ==========================================
 // 🧩 EMBED COMPONENTS
@@ -629,12 +634,7 @@ export default function App() {
   if (db === null) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-[#0d1117] text-gray-500"><RefreshCw className="animate-spin mr-2"/> Loading Vault...</div>;
 
   // --- Sorting Collections ---
-  const displaySections = (() => {
-    const secs = Object.keys(db);
-    if (collectionSortOrder === 'asc') return [...secs].sort((a, b) => a.localeCompare(b));
-    if (collectionSortOrder === 'desc') return [...secs].sort((a, b) => b.localeCompare(a));
-    return secs; 
-  })();
+  const displaySections = getOrderedSections(Object.keys(db), collectionSortOrder);
 
   // --- Strict Search Engine ---
   const queryTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
@@ -739,6 +739,8 @@ export default function App() {
             keys.forEach(k => { orderedDb[k] = prev[k] });
             return orderedDb;
          });
+         // Keep the moved collection highlighted after reorder.
+         setActiveSection(sourceCol);
       }
     }
   };
@@ -1327,7 +1329,14 @@ export default function App() {
                       <h5 className="font-medium text-sm">Collection Sort Order</h5>
                       <p className="text-xs text-gray-500 dark:text-[#8b949e]">Choose how collections are ordered throughout the app.</p>
                     </div>
-                    <select value={collectionSortOrder} onChange={(e) => setCollectionSortOrder(e.target.value)} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
+                    <select value={collectionSortOrder} onChange={(e) => {
+                      const nextOrder = e.target.value;
+                      setCollectionSortOrder(nextOrder);
+                      if (!db) return;
+
+                      const orderedSections = getOrderedSections(Object.keys(db), nextOrder);
+                      setActiveSection(orderedSections[0] || "");
+                    }} className="bg-white dark:bg-[#010409] border border-gray-300 dark:border-[#30363d] rounded-md p-2 text-sm focus:border-blue-500 dark:focus:border-[#58a6ff] focus:outline-none">
                       <option value="asc">Ascending (A-Z)</option>
                       <option value="desc">Descending (Z-A)</option>
                       <option value="custom">Custom (Drag & Drop)</option>
