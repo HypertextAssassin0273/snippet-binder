@@ -883,7 +883,7 @@ export default function App() {
 
           <div className="p-4 border-t border-gray-200 dark:border-[#30363d] space-y-2 min-w-[255px]">
             <button onClick={() => setSectionPromptOpen(true)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-[#1f6feb] dark:hover:bg-[#388bfd] border border-transparent dark:border-[#1f6feb] rounded-md"><Plus size={16} /> New Collection</button>
-            <button onClick={() => setIsSettingsOpen(true)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-gray-300 dark:border-[#30363d] rounded-md"><Settings size={16} /> Settings</button>
+            <button onClick={() => setIsSettingsOpen(true)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-100 dark:text-[#c9d1d9] dark:bg-[#21262d] dark:hover:bg-[#30363d] border border-gray-300 dark:border-[#30363d] rounded-md"><Settings size={16} /> Settings</button>
           </div>
         </div>
       </div>
